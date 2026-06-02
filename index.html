@@ -1,0 +1,3854 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>中金香港证券 · 持仓看板</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"PingFang SC","Microsoft YaHei",sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh}
+  .header{background:linear-gradient(135deg,#1e2761 0%,#0f1117 100%);padding:24px 32px;border-bottom:1px solid #2d3748}
+  .header h1{font-size:22px;font-weight:700;color:#fff;letter-spacing:.5px}
+  .header .sub{font-size:13px;color:#718096;margin-top:4px}
+  .date-bar{display:flex;align-items:center;gap:12px;padding:16px 32px;background:#161b27;border-bottom:1px solid #2d3748;flex-wrap:wrap}
+  .date-bar label{font-size:13px;color:#a0aec0}
+  .date-btn{padding:6px 16px;border-radius:20px;border:1px solid #2d3748;background:transparent;color:#a0aec0;cursor:pointer;font-size:13px;transition:.2s}
+  .date-btn.active{background:#3d4d8c;border-color:#5d6fb8;color:#fff;font-weight:600}
+  .date-btn:hover:not(.active){border-color:#5d6fb8;color:#e2e8f0}
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:24px 32px}
+  .kpi{background:#161b27;border:1px solid #2d3748;border-radius:12px;padding:20px;position:relative;overflow:hidden}
+  .kpi::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%;background:var(--accent)}
+  .kpi .label{font-size:12px;color:#718096;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px}
+  .kpi .value{font-size:24px;font-weight:700;color:#fff}
+  .kpi .delta{font-size:12px;margin-top:6px;color:#718096}
+  .kpi .delta.up{color:#48bb78}
+  .kpi .delta.down{color:#fc8181}
+  .charts-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0 32px 24px}
+  .chart-card{background:#161b27;border:1px solid #2d3748;border-radius:12px;padding:20px}
+  .chart-card.wide{grid-column:1/-1}
+  .chart-title{font-size:14px;font-weight:600;color:#a0aec0;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+  .chart-title .dot{width:8px;height:8px;border-radius:50%;background:var(--color,#c9a961)}
+  .holdings-section{padding:0 32px 32px}
+  .search-bar{display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center}
+  .search-bar input{flex:1;min-width:200px;padding:8px 14px;border-radius:8px;border:1px solid #2d3748;background:#0f1117;color:#e2e8f0;font-size:14px;outline:none}
+  .search-bar input:focus{border-color:#5d6fb8}
+  .search-bar select{padding:8px 12px;border-radius:8px;border:1px solid #2d3748;background:#0f1117;color:#a0aec0;font-size:13px;outline:none;cursor:pointer}
+  .sort-hint{font-size:12px;color:#4a5568;margin-left:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{padding:10px 12px;text-align:left;color:#718096;font-weight:600;border-bottom:1px solid #2d3748;cursor:pointer;user-select:none;white-space:nowrap}
+  thead th:hover{color:#e2e8f0}
+  thead th.sorted{color:#c9a961}
+  tbody tr{border-bottom:1px solid #1a2035;transition:.15s}
+  tbody tr:hover{background:#1e2537}
+  tbody td{padding:9px 12px;vertical-align:middle}
+  .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+  .badge-us{background:#1a3a5c;color:#63b3ed}
+  .badge-hk{background:#3a2a1a;color:#f6ad55}
+  .bar-cell{display:flex;align-items:center;gap:8px}
+  .bar-bg{flex:1;height:6px;background:#2d3748;border-radius:3px;min-width:60px}
+  .bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#3d4d8c,#5d6fb8)}
+  .pct-text{font-size:12px;color:#718096;white-space:nowrap}
+  .trend-section{padding:0 32px 24px}
+  .trades-card{background:#161b27;border:1px solid #2d3748;border-radius:12px;padding:20px;margin:0 32px 24px}
+  .trades-table td,.trades-table th{padding:8px 12px}
+  .side-buy{color:#48bb78;font-weight:600}
+  .side-sell{color:#fc8181;font-weight:600}
+  .empty{text-align:center;padding:32px;color:#4a5568;font-size:14px}
+  @media(max-width:768px){
+    .kpi-grid{grid-template-columns:1fr 1fr}
+    .charts-row{grid-template-columns:1fr}
+    .chart-card.wide{grid-column:auto}
+    .kpi-grid,.charts-row,.holdings-section,.trend-section,.trades-card{padding-left:16px;padding-right:16px}
+    .date-bar{padding:12px 16px}
+    .header{padding:16px}
+  }
+</style>
+</head>
+<body>
+<div id="lockScreen" style="position:fixed;inset:0;background:#0f1117;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:24px">
+  <div style="text-align:center">
+    <div style="font-size:36px;margin-bottom:12px">🔒</div>
+    <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:4px">中金持仓看板</div>
+    <div style="font-size:13px;color:#718096;margin-bottom:32px">请输入访问密码</div>
+    <input id="pwInput" type="password" placeholder="输入密码" onkeydown="if(event.key==='Enter')checkPw()"
+      style="width:240px;padding:12px 16px;border-radius:8px;border:1px solid #2d3748;background:#161b27;color:#e2e8f0;font-size:16px;outline:none;text-align:center;display:block;margin:0 auto 16px">
+    <button onclick="checkPw()"
+      style="padding:12px 32px;border-radius:8px;background:#3d4d8c;border:none;color:#fff;font-size:15px;font-weight:600;cursor:pointer;width:240px">
+      进入
+    </button>
+    <div id="pwErr" style="color:#fc8181;font-size:13px;margin-top:12px;display:none">密码错误，请重试</div>
+  </div>
+</div>
+<script>
+(function(){
+  const KEY = 'cicc_auth';
+  const HASH = '5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8'; // 默认密码: password
+  function sha256(str){
+    // 简单哈希验证
+    return Array.from(new TextEncoder().encode(str)).reduce((h,b)=>((h<<5)-h+b)|0,0).toString(16);
+  }
+  if(sessionStorage.getItem(KEY)==='1'){
+    document.getElementById('lockScreen').style.display='none';
+  }
+  window.checkPw = function(){
+    const v = document.getElementById('pwInput').value;
+    // 密码存储在这里（明文，可修改）
+    if(v === 'CICC2026'){
+      sessionStorage.setItem(KEY,'1');
+      document.getElementById('lockScreen').style.display='none';
+    } else {
+      document.getElementById('pwErr').style.display='block';
+      document.getElementById('pwInput').value='';
+      document.getElementById('pwInput').focus();
+    }
+  }
+})();
+</script>
+
+
+<div class="header">
+  <h1>🏦 中金香港证券 · 持仓看板</h1>
+  <div class="sub" id="lastUpdate">最后更新：—</div>
+</div>
+
+<div class="date-bar">
+  <label>选择日期：</label>
+  <div id="dateBtns" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+</div>
+
+<!-- KPI -->
+<div class="kpi-grid">
+  <div class="kpi" style="--accent:#c9a961">
+    <div class="label">净资产市值</div>
+    <div class="value" id="kpi-nav">—</div>
+    <div class="delta" id="kpi-nav-d">—</div>
+  </div>
+  <div class="kpi" style="--accent:#3d4d8c">
+    <div class="label">投资组合总值</div>
+    <div class="value" id="kpi-port">—</div>
+    <div class="delta" id="kpi-port-d">—</div>
+  </div>
+  <div class="kpi" style="--accent:#2e8b57">
+    <div class="label">现金结余</div>
+    <div class="value" id="kpi-cash">—</div>
+    <div class="delta" id="kpi-cash-d">—</div>
+  </div>
+  <div class="kpi" style="--accent:#718096">
+    <div class="label">持仓只数</div>
+    <div class="value" id="kpi-hold">—</div>
+    <div class="delta" id="kpi-hold-d">—</div>
+  </div>
+</div>
+
+<!-- 趋势图 -->
+<div class="trend-section">
+  <div class="chart-card">
+    <div class="chart-title"><span class="dot" style="--color:#c9a961"></span>净资产历史走势</div>
+    <canvas id="trendChart" height="80"></canvas>
+  </div>
+</div>
+
+<!-- 图表行 -->
+<div class="charts-row">
+  <div class="chart-card">
+    <div class="chart-title"><span class="dot"></span>行业大类分布</div>
+    <canvas id="sectorChart" height="220"></canvas>
+  </div>
+  <div class="chart-card">
+    <div class="chart-title"><span class="dot" style="--color:#3d4d8c"></span>Top 10 持仓 (USD)</div>
+    <canvas id="top10Chart" height="220"></canvas>
+  </div>
+</div>
+
+<!-- 当日交易 -->
+<div class="trades-card" id="tradesSection">
+  <div class="chart-title"><span class="dot" style="--color:#48bb78"></span>当日交易 <span id="tradeCount" style="font-size:12px;color:#718096"></span></div>
+  <div id="tradesBody"></div>
+</div>
+
+<!-- 持仓明细 -->
+<div class="holdings-section">
+  <div class="chart-title" style="margin-bottom:12px"><span class="dot" style="--color:#5d6fb8"></span>持仓明细</div>
+  <div class="search-bar">
+    <input id="searchInput" placeholder="搜索代码 / 名称..." oninput="renderTable()">
+    <select id="sectorFilter" onchange="renderTable()">
+      <option value="">全部行业</option>
+    </select>
+    <select id="marketFilter" onchange="renderTable()">
+      <option value="">美股+港股</option>
+      <option value="美股">美股</option>
+      <option value="港股">港股</option>
+    </select>
+    <span class="sort-hint" id="sortHint">点击表头排序</span>
+  </div>
+  <table id="holdTable">
+    <thead>
+      <tr>
+        <th onclick="sortBy('code')">代码</th>
+        <th onclick="sortBy('name')">名称</th>
+        <th onclick="sortBy('market')">市场</th>
+        <th onclick="sortBy('sector')">行业</th>
+        <th onclick="sortBy('sub')">子板块</th>
+        <th onclick="sortBy('qty')" style="text-align:right">数量</th>
+        <th onclick="sortBy('price')" style="text-align:right">收市价</th>
+        <th onclick="sortBy('mv_usd')" style="text-align:right">市值 (USD)</th>
+        <th onclick="sortBy('pct')">占比</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+  <div id="tableEmpty" class="empty" style="display:none">无匹配持仓</div>
+</div>
+
+<script>
+const ALL_DATA = [
+  {
+    "date": "2026-05-01",
+    "net_asset": 1645212.21,
+    "port_val": 1334293.43,
+    "cash_val": 310918.78,
+    "n_hold": 48,
+    "holdings": [
+      {
+        "market": "美股",
+        "code": "NVDA",
+        "name": "NVIDIA CORP (NGS)",
+        "qty": 1000,
+        "price": 199.57,
+        "ccy": "USD",
+        "mv_usd": 199570.0,
+        "pct": 14.96,
+        "sector": "AI算力/半导体",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "GLD",
+        "name": "SPDR GOLD SHARES",
+        "qty": 215,
+        "price": 423.66,
+        "ccy": "USD",
+        "mv_usd": 91086.9,
+        "pct": 6.83,
+        "sector": "稀土/金属/贵金属",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "GOOGL",
+        "name": "ALPHABET INC-CL A",
+        "qty": 170,
+        "price": 384.8,
+        "ccy": "USD",
+        "mv_usd": 65416.0,
+        "pct": 4.9,
+        "sector": "AI软件/平台",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "MU",
+        "name": "MICRON",
+        "qty": 100,
+        "price": 517.16,
+        "ccy": "USD",
+        "mv_usd": 51716.0,
+        "pct": 3.88,
+        "sector": "AI算力/半导体",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "AMD",
+        "name": "ADVANCED MICRO",
+        "qty": 140,
+        "price": 354.49,
+        "ccy": "USD",
+        "mv_usd": 49628.6,
+        "pct": 3.72,
+        "sector": "AI算力/半导体",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "RKLB",
+        "name": "ROCKET LAB CORP",
+        "qty": 600,
+        "price": 82.51,
+        "ccy": "USD",
+        "mv_usd": 49506.0,
+        "pct": 3.71,
+        "sector": "太空/无人机/国防",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "PLTR",
+        "name": "PALANTIR",
+        "qty": 320,
+        "price": 139.11,
+        "ccy": "USD",
+        "mv_usd": 44515.2,
+        "pct": 3.34,
+        "sector": "AI软件/平台",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "INTC",
+        "name": "INTEL CORP (NGS)",
+        "qty": 450,
+        "price": 94.48,
+        "ccy": "USD",
+        "mv_usd": 42516.0,
+        "pct": 3.19,
+        "sector": "AI算力/半导体",
+        "sub": "未分类"
+      },
+      {
+        "market": "港股",
+        "code": "00981",
+        "name": "SMIC",
+        "qty": 4500,
+        "price": 70.9,
+        "ccy": "HKD",
+        "mv_usd": 40869.79,
+        "pct": 3.06,
+        "sector": "AI算力/半导体",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "TSM",
+        "name": "TAIWAN",
+        "qty": 100,
+        "price": 396.06,
+        "ccy": "USD",
+        "mv_usd": 39606.0,
+        "pct": 2.97,
+        "sector": "AI算力/半导体",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "NBIS",
+        "name": "NEBIUS GROUP NV",
+        "qty": 270,
+        "price": 138.23,
+        "ccy": "USD",
+        "mv_usd": 37322.1,
+        "pct": 2.8,
+        "sector": "AI算力/半导体",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "HOOD",
+        "name": "ROBINHOOD",
+        "qty": 500,
+        "price": 72.89,
+        "ccy": "USD",
+        "mv_usd": 36445.0,
+        "pct": 2.73,
+        "sector": "金融科技/加密",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "TSLA",
+        "name": "TESLA INC (NGS)",
+        "qty": 90,
+        "price": 381.63,
+        "ccy": "USD",
+        "mv_usd": 34346.7,
+        "pct": 2.57,
+        "sector": "消费/医疗/其他",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "CRWV",
+        "name": "COREWEAVE INC-CL",
+        "qty": 300,
+        "price": 111.6,
+        "ccy": "USD",
+        "mv_usd": 33480.0,
+        "pct": 2.51,
+        "sector": "AI算力/半导体",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "SNDK",
+        "name": "SANDISK CORP",
+        "qty": 30,
+        "price": 1096.51,
+        "ccy": "USD",
+        "mv_usd": 32895.3,
+        "pct": 2.47,
+        "sector": "AI算力/半导体",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "ONDS",
+        "name": "ONDAS INC (NCM)",
+        "qty": 3165,
+        "price": 10.04,
+        "ccy": "USD",
+        "mv_usd": 31776.6,
+        "pct": 2.38,
+        "sector": "太空/无人机/国防",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "META",
+        "name": "META PLATFORMS",
+        "qty": 50,
+        "price": 611.91,
+        "ccy": "USD",
+        "mv_usd": 30595.5,
+        "pct": 2.29,
+        "sector": "AI软件/平台",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "SLV",
+        "name": "ISHARES SILVER",
+        "qty": 450,
+        "price": 66.66,
+        "ccy": "USD",
+        "mv_usd": 29997.0,
+        "pct": 2.25,
+        "sector": "稀土/金属/贵金属",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "MSFT",
+        "name": "MICROSOFT CORP",
+        "qty": 70,
+        "price": 407.78,
+        "ccy": "USD",
+        "mv_usd": 28544.6,
+        "pct": 2.14,
+        "sector": "AI软件/平台",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "AEHR",
+        "name": "AEHR TEST",
+        "qty": 300,
+        "price": 90.56,
+        "ccy": "USD",
+        "mv_usd": 27168.0,
+        "pct": 2.04,
+        "sector": "AI算力/半导体",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "AVGO",
+        "name": "BROADCOM INC",
+        "qty": 56,
+        "price": 417.43,
+        "ccy": "USD",
+        "mv_usd": 23376.08,
+        "pct": 1.75,
+        "sector": "AI算力/半导体",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "SATS",
+        "name": "ECHOSTAR CORP-A",
+        "qty": 180,
+        "price": 123.14,
+        "ccy": "USD",
+        "mv_usd": 22165.2,
+        "pct": 1.66,
+        "sector": "太空/无人机/国防",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "KTOS",
+        "name": "KRATOS DEFENSE &",
+        "qty": 342,
+        "price": 63.05,
+        "ccy": "USD",
+        "mv_usd": 21563.1,
+        "pct": 1.62,
+        "sector": "太空/无人机/国防",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "RMBS",
+        "name": "RAMBUS INC (NGS)",
+        "qty": 180,
+        "price": 115.11,
+        "ccy": "USD",
+        "mv_usd": 20719.8,
+        "pct": 1.55,
+        "sector": "AI算力/半导体",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "AAOI",
+        "name": "APPLIED",
+        "qty": 120,
+        "price": 164.36,
+        "ccy": "USD",
+        "mv_usd": 19723.2,
+        "pct": 1.48,
+        "sector": "AI算力/半导体",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "MRVL",
+        "name": "MARVELL",
+        "qty": 100,
+        "price": 165.15,
+        "ccy": "USD",
+        "mv_usd": 16515.0,
+        "pct": 1.24,
+        "sector": "AI算力/半导体",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "USAR",
+        "name": "USA RARE EARTH",
+        "qty": 600,
+        "price": 25.97,
+        "ccy": "USD",
+        "mv_usd": 15582.0,
+        "pct": 1.17,
+        "sector": "稀土/金属/贵金属",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "PLTU",
+        "name": "DIRE DLY PLTR BUL",
+        "qty": 400,
+        "price": 38.83,
+        "ccy": "USD",
+        "mv_usd": 15532.0,
+        "pct": 1.16,
+        "sector": "AI软件/平台",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "METU",
+        "name": "DIREX DLY META",
+        "qty": 600,
+        "price": 24.96,
+        "ccy": "USD",
+        "mv_usd": 14976.0,
+        "pct": 1.12,
+        "sector": "AI软件/平台",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "ASTS",
+        "name": "AST SPACEMOBILE",
+        "qty": 200,
+        "price": 73.9,
+        "ccy": "USD",
+        "mv_usd": 14780.0,
+        "pct": 1.11,
+        "sector": "太空/无人机/国防",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "POET",
+        "name": "POET",
+        "qty": 2000,
+        "price": 7.12,
+        "ccy": "USD",
+        "mv_usd": 14240.0,
+        "pct": 1.07,
+        "sector": "AI算力/半导体",
+        "sub": "未分类"
+      },
+      {
+        "market": "港股",
+        "code": "09886",
+        "name": "DINGDANG HEALTH",
+        "qty": 100000,
+        "price": 1.06,
+        "ccy": "HKD",
+        "mv_usd": 13578.43,
+        "pct": 1.02,
+        "sector": "消费/医疗/其他",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "AMPX",
+        "name": "AMPRIUS",
+        "qty": 630,
+        "price": 21.06,
+        "ccy": "USD",
+        "mv_usd": 13267.8,
+        "pct": 0.99,
+        "sector": "稀土/金属/贵金属",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "MP",
+        "name": "MP MATERIALS",
+        "qty": 200,
+        "price": 66.04,
+        "ccy": "USD",
+        "mv_usd": 13208.0,
+        "pct": 0.99,
+        "sector": "稀土/金属/贵金属",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "COIN",
+        "name": "COINBASE GLOBAL",
+        "qty": 70,
+        "price": 187.77,
+        "ccy": "USD",
+        "mv_usd": 13143.9,
+        "pct": 0.99,
+        "sector": "金融科技/加密",
+        "sub": "未分类"
+      },
+      {
+        "market": "港股",
+        "code": "02020",
+        "name": "ANTA SPORTS",
+        "qty": 1200,
+        "price": 81.15,
+        "ccy": "HKD",
+        "mv_usd": 12474.22,
+        "pct": 0.93,
+        "sector": "消费/医疗/其他",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "ADBE",
+        "name": "ADOBE INC (NGS)",
+        "qty": 50,
+        "price": 246.1,
+        "ccy": "USD",
+        "mv_usd": 12305.0,
+        "pct": 0.92,
+        "sector": "AI软件/平台",
+        "sub": "未分类"
+      },
+      {
+        "market": "港股",
+        "code": "02228",
+        "name": "XTALPI",
+        "qty": 10000,
+        "price": 9.53,
+        "ccy": "HKD",
+        "mv_usd": 12207.78,
+        "pct": 0.91,
+        "sector": "AI软件/平台",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "OKLO",
+        "name": "OKLO INC (NYS)",
+        "qty": 160,
+        "price": 72.5,
+        "ccy": "USD",
+        "mv_usd": 11600.0,
+        "pct": 0.87,
+        "sector": "量子/前沿科技",
+        "sub": "未分类"
+      },
+      {
+        "market": "港股",
+        "code": "01788",
+        "name": "GUOTAI JUNAN I",
+        "qty": 34000,
+        "price": 2.42,
+        "ccy": "HKD",
+        "mv_usd": 10539.93,
+        "pct": 0.79,
+        "sector": "金融科技/加密",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "CRCL",
+        "name": "CIRCLE INTERNET",
+        "qty": 98,
+        "price": 90.88,
+        "ccy": "USD",
+        "mv_usd": 8906.24,
+        "pct": 0.67,
+        "sector": "金融科技/加密",
+        "sub": "未分类"
+      },
+      {
+        "market": "港股",
+        "code": "01810",
+        "name": "XIAOMI-W",
+        "qty": 2000,
+        "price": 29.02,
+        "ccy": "HKD",
+        "mv_usd": 7434.83,
+        "pct": 0.56,
+        "sector": "消费/医疗/其他",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "RGC",
+        "name": "REGENCELL",
+        "qty": 170,
+        "price": 29.22,
+        "ccy": "USD",
+        "mv_usd": 4967.4,
+        "pct": 0.37,
+        "sector": "消费/医疗/其他",
+        "sub": "未分类"
+      },
+      {
+        "market": "港股",
+        "code": "09992",
+        "name": "POP MART",
+        "qty": 200,
+        "price": 157.2,
+        "ccy": "HKD",
+        "mv_usd": 4027.41,
+        "pct": 0.3,
+        "sector": "消费/医疗/其他",
+        "sub": "未分类"
+      },
+      {
+        "market": "港股",
+        "code": "00020",
+        "name": "SENSETIME-W",
+        "qty": 1500,
+        "price": 1.98,
+        "ccy": "HKD",
+        "mv_usd": 380.45,
+        "pct": 0.03,
+        "sector": "AI软件/平台",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "OPENW",
+        "name": "OPENDOOR",
+        "qty": 50,
+        "price": 0.7607,
+        "ccy": "USD",
+        "mv_usd": 38.04,
+        "pct": 0.0,
+        "sector": "消费/医疗/其他",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "OPENL",
+        "name": "OPENDOOR",
+        "qty": 50,
+        "price": 0.4128,
+        "ccy": "USD",
+        "mv_usd": 20.64,
+        "pct": 0.0,
+        "sector": "消费/医疗/其他",
+        "sub": "未分类"
+      },
+      {
+        "market": "美股",
+        "code": "OPENZ",
+        "name": "OPENDOOR",
+        "qty": 50,
+        "price": 0.3939,
+        "ccy": "USD",
+        "mv_usd": 19.7,
+        "pct": 0.0,
+        "sector": "消费/医疗/其他",
+        "sub": "未分类"
+      }
+    ],
+    "trades": [
+      {
+        "code": "NVDA",
+        "name": "NVIDIA CORP (NGS)",
+        "side": "买入",
+        "qty": 200,
+        "price": 201,
+        "amount": -40280.4
+      },
+      {
+        "code": "ONDS",
+        "name": "ONDAS INC (NCM)",
+        "side": "卖出",
+        "qty": 4335,
+        "price": 9.6892,
+        "amount": 41917.8
+      },
+      {
+        "code": "AAOI",
+        "name": "APPLIED OPTOELECTRONICS",
+        "side": "卖出",
+        "qty": 25,
+        "price": 158.4,
+        "amount": 3951.99
+      },
+      {
+        "code": "RKLB",
+        "name": "ROCKET LAB CORP (NCM)",
+        "side": "卖出",
+        "qty": 50,
+        "price": 82.6,
+        "amount": 4121.65
+      },
+      {
+        "code": "AEHR",
+        "name": "AEHR TEST SYSTEMS (NCM)",
+        "side": "卖出",
+        "qty": 30,
+        "price": 90.43,
+        "amount": 2707.41
+      },
+      {
+        "code": "AMD",
+        "name": "ADVANCED MICRO DEVICES",
+        "side": "卖出",
+        "qty": 10,
+        "price": 354,
+        "amount": 3532.84
+      },
+      {
+        "code": "GOOGL",
+        "name": "ALPHABET INC-CL A (NGS)",
+        "side": "卖出",
+        "qty": 10,
+        "price": 383.04,
+        "amount": 3822.66
+      },
+      {
+        "code": "MU",
+        "name": "MICRON TECHNOLOGY INC",
+        "side": "买入",
+        "qty": 20,
+        "price": 508,
+        "amount": -10180.32
+      },
+      {
+        "code": "TSM",
+        "name": "TAIWAN SEMICONDUCTOR-SP",
+        "side": "买入",
+        "qty": 15,
+        "price": 388,
+        "amount": -5831.64
+      },
+      {
+        "code": "KGC",
+        "name": "KINROSS GOLD CORP (NYS)",
+        "side": "卖出",
+        "qty": 350,
+        "price": 30.53,
+        "amount": 10663.9
+      },
+      {
+        "code": "RCAT",
+        "name": "RED CAT HOLDINGS INC (NCM)",
+        "side": "卖出",
+        "qty": 900,
+        "price": 11.5,
+        "amount": 10329.08
+      },
+      {
+        "code": "RDW",
+        "name": "REDWIRE CORP (NYS)",
+        "side": "卖出",
+        "qty": 900,
+        "price": 9.1,
+        "amount": 8173.45
+      },
+      {
+        "code": "SOFI",
+        "name": "SOFI TECHNOLOGIES INC (NGS)",
+        "side": "卖出",
+        "qty": 800,
+        "price": 15.63,
+        "amount": 12478.73
+      },
+      {
+        "code": "PALL",
+        "name": "ABRDN PHYSICAL PALLADIUM",
+        "side": "卖出",
+        "qty": 100,
+        "price": 133.71,
+        "amount": 13343.98
+      },
+      {
+        "code": "OUST",
+        "name": "OUSTER INC (NGS)",
+        "side": "卖出",
+        "qty": 600,
+        "price": 25.7,
+        "amount": 15388.84
+      },
+      {
+        "code": "HIMS",
+        "name": "HIMS & HERS HEALTH INC",
+        "side": "卖出",
+        "qty": 400,
+        "price": 25.79,
+        "amount": 10295.15
+      },
+      {
+        "code": "APP",
+        "name": "APPLOVIN CORP-CLASS A (NGS)",
+        "side": "卖出",
+        "qty": 27,
+        "price": 440,
+        "amount": 11855.99
+      },
+      {
+        "code": "SOUN",
+        "name": "SOUNDHOUND AI INC-A (NMS)",
+        "side": "卖出",
+        "qty": 1100,
+        "price": 7.74,
+        "amount": 8496.79
+      },
+      {
+        "code": "PL",
+        "name": "PLANET LABS PBC (NYS)",
+        "side": "卖出",
+        "qty": 300,
+        "price": 35.2,
+        "amount": 10538.66
+      },
+      {
+        "code": "RGTI",
+        "name": "RIGETTI COMPUTING INC",
+        "side": "卖出",
+        "qty": 300,
+        "price": 16.28,
+        "amount": 4874.12
+      },
+      {
+        "code": "TEM",
+        "name": "TEMPUS AI INC-CL A (NGS)",
+        "side": "卖出",
+        "qty": 200,
+        "price": 53,
+        "amount": 10578.58
+      },
+      {
+        "code": "ACHR",
+        "name": "ARCHER AVIATION INC-A (NYS)",
+        "side": "卖出",
+        "qty": 1000,
+        "price": 5.625,
+        "amount": 5613.63
+      }
+    ]
+  },
+  {
+    "date": "2026-05-05",
+    "net_asset": 1668766.13,
+    "port_val": 1347459.2,
+    "cash_val": 321306.93,
+    "n_hold": 48,
+    "holdings": [
+      {
+        "market": "美股",
+        "code": "NVDA",
+        "name": "NVIDIA CORP (NGS)",
+        "qty": 1000,
+        "price": 198.48,
+        "ccy": "USD",
+        "mv_usd": 198480.0,
+        "pct": 14.73,
+        "sector": "AI算力/半导体",
+        "sub": "GPU/AI芯片"
+      },
+      {
+        "market": "美股",
+        "code": "GLD",
+        "name": "SPDR GOLD SHARES",
+        "qty": 215,
+        "price": 414.71,
+        "ccy": "USD",
+        "mv_usd": 89162.65,
+        "pct": 6.62,
+        "sector": "稀土/金属/贵金属",
+        "sub": "黄金ETF"
+      },
+      {
+        "market": "美股",
+        "code": "GOOGL",
+        "name": "ALPHABET INC-CL A",
+        "qty": 170,
+        "price": 383.25,
+        "ccy": "USD",
+        "mv_usd": 65152.5,
+        "pct": 4.84,
+        "sector": "AI软件/平台",
+        "sub": "大型科技"
+      },
+      {
+        "market": "美股",
+        "code": "MU",
+        "name": "MICRON",
+        "qty": 100,
+        "price": 576.45,
+        "ccy": "USD",
+        "mv_usd": 57645.0,
+        "pct": 4.28,
+        "sector": "AI算力/半导体",
+        "sub": "存储"
+      },
+      {
+        "market": "美股",
+        "code": "RKLB",
+        "name": "ROCKET LAB CORP",
+        "qty": 600,
+        "price": 80.31,
+        "ccy": "USD",
+        "mv_usd": 48186.0,
+        "pct": 3.58,
+        "sector": "太空/无人机/国防",
+        "sub": "火箭"
+      },
+      {
+        "market": "美股",
+        "code": "AMD",
+        "name": "ADVANCED MICRO",
+        "qty": 140,
+        "price": 341.54,
+        "ccy": "USD",
+        "mv_usd": 47815.6,
+        "pct": 3.55,
+        "sector": "AI算力/半导体",
+        "sub": "GPU/AI芯片"
+      },
+      {
+        "market": "美股",
+        "code": "PLTR",
+        "name": "PALANTIR",
+        "qty": 320,
+        "price": 146.03,
+        "ccy": "USD",
+        "mv_usd": 46729.6,
+        "pct": 3.47,
+        "sector": "AI软件/平台",
+        "sub": "AI数据/政企"
+      },
+      {
+        "market": "美股",
+        "code": "HOOD",
+        "name": "ROBINHOOD",
+        "qty": 600,
+        "price": 76.55,
+        "ccy": "USD",
+        "mv_usd": 45930.0,
+        "pct": 3.41,
+        "sector": "金融科技/加密",
+        "sub": "券商"
+      },
+      {
+        "market": "美股",
+        "code": "INTC",
+        "name": "INTEL CORP (NGS)",
+        "qty": 450,
+        "price": 95.78,
+        "ccy": "USD",
+        "mv_usd": 43101.0,
+        "pct": 3.2,
+        "sector": "AI算力/半导体",
+        "sub": "CPU/代工"
+      },
+      {
+        "market": "港股",
+        "code": "00981",
+        "name": "SMIC",
+        "qty": 4500,
+        "price": 70.8,
+        "ccy": "HKD",
+        "mv_usd": 40830.45,
+        "pct": 3.03,
+        "sector": "AI算力/半导体",
+        "sub": "代工(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "NBIS",
+        "name": "NEBIUS GROUP NV",
+        "qty": 230,
+        "price": 176.42,
+        "ccy": "USD",
+        "mv_usd": 40576.6,
+        "pct": 3.01,
+        "sector": "AI算力/半导体",
+        "sub": "AI云算力"
+      },
+      {
+        "market": "美股",
+        "code": "TSM",
+        "name": "TAIWAN",
+        "qty": 100,
+        "price": 401.61,
+        "ccy": "USD",
+        "mv_usd": 40161.0,
+        "pct": 2.98,
+        "sector": "AI算力/半导体",
+        "sub": "代工"
+      },
+      {
+        "market": "美股",
+        "code": "SNDK",
+        "name": "SANDISK CORP",
+        "qty": 30,
+        "price": 1255.86,
+        "ccy": "USD",
+        "mv_usd": 37675.8,
+        "pct": 2.8,
+        "sector": "AI算力/半导体",
+        "sub": "存储"
+      },
+      {
+        "market": "美股",
+        "code": "TSLA",
+        "name": "TESLA INC (NGS)",
+        "qty": 90,
+        "price": 392.51,
+        "ccy": "USD",
+        "mv_usd": 35325.9,
+        "pct": 2.62,
+        "sector": "消费/医疗/其他",
+        "sub": "电动车"
+      },
+      {
+        "market": "美股",
+        "code": "CRWV",
+        "name": "COREWEAVE INC-CL",
+        "qty": 250,
+        "price": 125.43,
+        "ccy": "USD",
+        "mv_usd": 31357.5,
+        "pct": 2.33,
+        "sector": "AI算力/半导体",
+        "sub": "AI云算力"
+      },
+      {
+        "market": "美股",
+        "code": "META",
+        "name": "META PLATFORMS",
+        "qty": 50,
+        "price": 610.41,
+        "ccy": "USD",
+        "mv_usd": 30520.5,
+        "pct": 2.27,
+        "sector": "AI软件/平台",
+        "sub": "大型科技"
+      },
+      {
+        "market": "美股",
+        "code": "SLV",
+        "name": "ISHARES SILVER",
+        "qty": 450,
+        "price": 65.94,
+        "ccy": "USD",
+        "mv_usd": 29673.0,
+        "pct": 2.2,
+        "sector": "稀土/金属/贵金属",
+        "sub": "白银ETF"
+      },
+      {
+        "market": "美股",
+        "code": "ONDS",
+        "name": "ONDAS INC (NCM)",
+        "qty": 3000,
+        "price": 9.73,
+        "ccy": "USD",
+        "mv_usd": 29190.0,
+        "pct": 2.17,
+        "sector": "太空/无人机/国防",
+        "sub": "无人机/通信"
+      },
+      {
+        "market": "美股",
+        "code": "MSFT",
+        "name": "MICROSOFT CORP",
+        "qty": 70,
+        "price": 413.62,
+        "ccy": "USD",
+        "mv_usd": 28953.4,
+        "pct": 2.15,
+        "sector": "AI软件/平台",
+        "sub": "大型科技"
+      },
+      {
+        "market": "美股",
+        "code": "AEHR",
+        "name": "AEHR TEST",
+        "qty": 300,
+        "price": 85.61,
+        "ccy": "USD",
+        "mv_usd": 25683.0,
+        "pct": 1.91,
+        "sector": "AI算力/半导体",
+        "sub": "半导体测试"
+      },
+      {
+        "market": "美股",
+        "code": "AVGO",
+        "name": "BROADCOM INC",
+        "qty": 56,
+        "price": 416.5,
+        "ccy": "USD",
+        "mv_usd": 23324.0,
+        "pct": 1.73,
+        "sector": "AI算力/半导体",
+        "sub": "AI网络芯片"
+      },
+      {
+        "market": "美股",
+        "code": "SATS",
+        "name": "ECHOSTAR CORP-A",
+        "qty": 180,
+        "price": 120.34,
+        "ccy": "USD",
+        "mv_usd": 21661.2,
+        "pct": 1.61,
+        "sector": "太空/无人机/国防",
+        "sub": "卫星通信"
+      },
+      {
+        "market": "美股",
+        "code": "KTOS",
+        "name": "KRATOS DEFENSE &",
+        "qty": 342,
+        "price": 61.93,
+        "ccy": "USD",
+        "mv_usd": 21180.06,
+        "pct": 1.57,
+        "sector": "太空/无人机/国防",
+        "sub": "国防"
+      },
+      {
+        "market": "美股",
+        "code": "RMBS",
+        "name": "RAMBUS INC (NGS)",
+        "qty": 180,
+        "price": 111.5,
+        "ccy": "USD",
+        "mv_usd": 20070.0,
+        "pct": 1.49,
+        "sector": "AI算力/半导体",
+        "sub": "IP/存储接口"
+      },
+      {
+        "market": "美股",
+        "code": "AAOI",
+        "name": "APPLIED",
+        "qty": 100,
+        "price": 172.98,
+        "ccy": "USD",
+        "mv_usd": 17298.0,
+        "pct": 1.28,
+        "sector": "AI算力/半导体",
+        "sub": "光通信"
+      },
+      {
+        "market": "美股",
+        "code": "QCOM",
+        "name": "QUALCOMM INC",
+        "qty": 100,
+        "price": 168.38,
+        "ccy": "USD",
+        "mv_usd": 16838.0,
+        "pct": 1.25,
+        "sector": "AI算力/半导体",
+        "sub": "移动/通信芯片"
+      },
+      {
+        "market": "美股",
+        "code": "MRVL",
+        "name": "MARVELL",
+        "qty": 100,
+        "price": 163.66,
+        "ccy": "USD",
+        "mv_usd": 16366.0,
+        "pct": 1.21,
+        "sector": "AI算力/半导体",
+        "sub": "网络芯片"
+      },
+      {
+        "market": "美股",
+        "code": "USAR",
+        "name": "USA RARE EARTH",
+        "qty": 600,
+        "price": 25.58,
+        "ccy": "USD",
+        "mv_usd": 15348.0,
+        "pct": 1.14,
+        "sector": "稀土/金属/贵金属",
+        "sub": "稀土"
+      },
+      {
+        "market": "美股",
+        "code": "METU",
+        "name": "DIREX DLY META",
+        "qty": 600,
+        "price": 24.84,
+        "ccy": "USD",
+        "mv_usd": 14904.0,
+        "pct": 1.11,
+        "sector": "AI软件/平台",
+        "sub": "杠杆ETF(META)"
+      },
+      {
+        "market": "美股",
+        "code": "POET",
+        "name": "POET",
+        "qty": 2000,
+        "price": 7.11,
+        "ccy": "USD",
+        "mv_usd": 14220.0,
+        "pct": 1.06,
+        "sector": "AI算力/半导体",
+        "sub": "光子集成"
+      },
+      {
+        "market": "美股",
+        "code": "COIN",
+        "name": "COINBASE GLOBAL",
+        "qty": 70,
+        "price": 202.99,
+        "ccy": "USD",
+        "mv_usd": 14209.3,
+        "pct": 1.05,
+        "sector": "金融科技/加密",
+        "sub": "加密交易所"
+      },
+      {
+        "market": "美股",
+        "code": "ASTS",
+        "name": "AST SPACEMOBILE",
+        "qty": 200,
+        "price": 68.43,
+        "ccy": "USD",
+        "mv_usd": 13686.0,
+        "pct": 1.02,
+        "sector": "太空/无人机/国防",
+        "sub": "卫星通信"
+      },
+      {
+        "market": "美股",
+        "code": "MP",
+        "name": "MP MATERIALS",
+        "qty": 200,
+        "price": 66.2,
+        "ccy": "USD",
+        "mv_usd": 13240.0,
+        "pct": 0.98,
+        "sector": "稀土/金属/贵金属",
+        "sub": "稀土"
+      },
+      {
+        "market": "港股",
+        "code": "09886",
+        "name": "DINGDANG HEALTH",
+        "qty": 100000,
+        "price": 1.03,
+        "ccy": "HKD",
+        "mv_usd": 13200.05,
+        "pct": 0.98,
+        "sector": "消费/医疗/其他",
+        "sub": "医疗(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "AMPX",
+        "name": "AMPRIUS",
+        "qty": 630,
+        "price": 20.38,
+        "ccy": "USD",
+        "mv_usd": 12839.4,
+        "pct": 0.95,
+        "sector": "稀土/金属/贵金属",
+        "sub": "锂电池"
+      },
+      {
+        "market": "美股",
+        "code": "ADBE",
+        "name": "ADOBE INC (NGS)",
+        "qty": 50,
+        "price": 253.96,
+        "ccy": "USD",
+        "mv_usd": 12698.0,
+        "pct": 0.94,
+        "sector": "AI软件/平台",
+        "sub": "应用软件"
+      },
+      {
+        "market": "港股",
+        "code": "02020",
+        "name": "ANTA SPORTS",
+        "qty": 1200,
+        "price": 78.2,
+        "ccy": "HKD",
+        "mv_usd": 12026.14,
+        "pct": 0.89,
+        "sector": "消费/医疗/其他",
+        "sub": "运动(港股)"
+      },
+      {
+        "market": "港股",
+        "code": "02228",
+        "name": "XTALPI",
+        "qty": 10000,
+        "price": 9.34,
+        "ccy": "HKD",
+        "mv_usd": 11969.76,
+        "pct": 0.89,
+        "sector": "AI软件/平台",
+        "sub": "AI制药(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "CRCL",
+        "name": "CIRCLE INTERNET",
+        "qty": 98,
+        "price": 119.53,
+        "ccy": "USD",
+        "mv_usd": 11713.94,
+        "pct": 0.87,
+        "sector": "金融科技/加密",
+        "sub": "稳定币"
+      },
+      {
+        "market": "美股",
+        "code": "OKLO",
+        "name": "OKLO INC (NYS)",
+        "qty": 160,
+        "price": 68.6,
+        "ccy": "USD",
+        "mv_usd": 10976.0,
+        "pct": 0.81,
+        "sector": "量子/前沿科技",
+        "sub": "小型核反应堆"
+      },
+      {
+        "market": "港股",
+        "code": "01788",
+        "name": "GUOTAI JUNAN I",
+        "qty": 34000,
+        "price": 2.42,
+        "ccy": "HKD",
+        "mv_usd": 10544.66,
+        "pct": 0.78,
+        "sector": "金融科技/加密",
+        "sub": "券商(港股)"
+      },
+      {
+        "market": "港股",
+        "code": "01810",
+        "name": "XIAOMI-W",
+        "qty": 2000,
+        "price": 30.46,
+        "ccy": "HKD",
+        "mv_usd": 7807.25,
+        "pct": 0.58,
+        "sector": "消费/医疗/其他",
+        "sub": "消费电子(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "RGC",
+        "name": "REGENCELL",
+        "qty": 170,
+        "price": 27.36,
+        "ccy": "USD",
+        "mv_usd": 4651.2,
+        "pct": 0.35,
+        "sector": "消费/医疗/其他",
+        "sub": "生物科技"
+      },
+      {
+        "market": "港股",
+        "code": "09992",
+        "name": "POP MART",
+        "qty": 200,
+        "price": 159.2,
+        "ccy": "HKD",
+        "mv_usd": 4080.48,
+        "pct": 0.3,
+        "sector": "消费/医疗/其他",
+        "sub": "潮玩(港股)"
+      },
+      {
+        "market": "港股",
+        "code": "00020",
+        "name": "SENSETIME-W",
+        "qty": 1500,
+        "price": 2,
+        "ccy": "HKD",
+        "mv_usd": 384.47,
+        "pct": 0.03,
+        "sector": "AI软件/平台",
+        "sub": "AI(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "OPENW",
+        "name": "OPENDOOR",
+        "qty": 50,
+        "price": 0.7261,
+        "ccy": "USD",
+        "mv_usd": 36.31,
+        "pct": 0.0,
+        "sector": "消费/医疗/其他",
+        "sub": "权证"
+      },
+      {
+        "market": "美股",
+        "code": "OPENL",
+        "name": "OPENDOOR",
+        "qty": 50,
+        "price": 0.3795,
+        "ccy": "USD",
+        "mv_usd": 18.98,
+        "pct": 0.0,
+        "sector": "消费/医疗/其他",
+        "sub": "权证"
+      },
+      {
+        "market": "美股",
+        "code": "OPENZ",
+        "name": "OPENDOOR",
+        "qty": 50,
+        "price": 0.37,
+        "ccy": "USD",
+        "mv_usd": 18.5,
+        "pct": 0.0,
+        "sector": "消费/医疗/其他",
+        "sub": "权证"
+      }
+    ],
+    "trades": [
+      {
+        "code": "QCOM",
+        "name": "QUALCOMM INC (NGS)",
+        "side": "买入",
+        "qty": 100,
+        "price": 169,
+        "amount": -16933.8
+      },
+      {
+        "code": "CRWV",
+        "name": "COREWEAVE INC-CL A (NGS)",
+        "side": "卖出",
+        "qty": 20,
+        "price": 129,
+        "amount": 2574.78
+      },
+      {
+        "code": "NBIS",
+        "name": "NEBIUS GROUP NV (NGS)",
+        "side": "卖出",
+        "qty": 20,
+        "price": 173,
+        "amount": 3453
+      }
+    ]
+  },
+  {
+    "date": "2026-05-11",
+    "net_asset": 1783185.12,
+    "port_val": 1493629.65,
+    "cash_val": 289555.47,
+    "n_hold": 53,
+    "holdings": [
+      {
+        "market": "美股",
+        "code": "NVDA",
+        "name": "NVIDIA CORP (NGS)",
+        "qty": 1000,
+        "price": 215.2,
+        "ccy": "USD",
+        "mv_usd": 215200.0,
+        "pct": 14.41,
+        "sector": "AI算力/半导体",
+        "sub": "GPU/AI芯片"
+      },
+      {
+        "market": "美股",
+        "code": "GLD",
+        "name": "SPDR GOLD SHARES",
+        "qty": 215,
+        "price": 433.77,
+        "ccy": "USD",
+        "mv_usd": 93260.55,
+        "pct": 6.24,
+        "sector": "稀土/金属/贵金属",
+        "sub": "黄金ETF"
+      },
+      {
+        "market": "美股",
+        "code": "MU",
+        "name": "MICRON",
+        "qty": 95,
+        "price": 746.81,
+        "ccy": "USD",
+        "mv_usd": 70946.95,
+        "pct": 4.75,
+        "sector": "AI算力/半导体",
+        "sub": "存储"
+      },
+      {
+        "market": "美股",
+        "code": "GOOGL",
+        "name": "ALPHABET INC-CL A",
+        "qty": 170,
+        "price": 400.8,
+        "ccy": "USD",
+        "mv_usd": 68136.0,
+        "pct": 4.56,
+        "sector": "AI软件/平台",
+        "sub": "大型科技"
+      },
+      {
+        "market": "美股",
+        "code": "AMD",
+        "name": "ADVANCED MICRO",
+        "qty": 120,
+        "price": 455.19,
+        "ccy": "USD",
+        "mv_usd": 54622.8,
+        "pct": 3.66,
+        "sector": "AI算力/半导体",
+        "sub": "GPU/AI芯片"
+      },
+      {
+        "market": "美股",
+        "code": "RKLB",
+        "name": "ROCKET LAB CORP",
+        "qty": 500,
+        "price": 105.47,
+        "ccy": "USD",
+        "mv_usd": 52735.0,
+        "pct": 3.53,
+        "sector": "太空/无人机/国防",
+        "sub": "火箭"
+      },
+      {
+        "market": "美股",
+        "code": "HOOD",
+        "name": "ROBINHOOD",
+        "qty": 600,
+        "price": 77.03,
+        "ccy": "USD",
+        "mv_usd": 46218.0,
+        "pct": 3.09,
+        "sector": "金融科技/加密",
+        "sub": "券商"
+      },
+      {
+        "market": "美股",
+        "code": "INTC",
+        "name": "INTEL CORP (NGS)",
+        "qty": 360,
+        "price": 124.92,
+        "ccy": "USD",
+        "mv_usd": 44971.2,
+        "pct": 3.01,
+        "sector": "AI算力/半导体",
+        "sub": "CPU/代工"
+      },
+      {
+        "market": "港股",
+        "code": "00981",
+        "name": "SMIC",
+        "qty": 4500,
+        "price": 76.6,
+        "ccy": "HKD",
+        "mv_usd": 44200.81,
+        "pct": 2.96,
+        "sector": "AI算力/半导体",
+        "sub": "代工(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "PLTR",
+        "name": "PALANTIR",
+        "qty": 320,
+        "price": 137.8,
+        "ccy": "USD",
+        "mv_usd": 44096.0,
+        "pct": 2.95,
+        "sector": "AI软件/平台",
+        "sub": "AI数据/政企"
+      },
+      {
+        "market": "美股",
+        "code": "SNDK",
+        "name": "SANDISK CORP",
+        "qty": 27,
+        "price": 1562.34,
+        "ccy": "USD",
+        "mv_usd": 42183.18,
+        "pct": 2.82,
+        "sector": "AI算力/半导体",
+        "sub": "存储"
+      },
+      {
+        "market": "美股",
+        "code": "TSM",
+        "name": "TAIWAN",
+        "qty": 100,
+        "price": 411.68,
+        "ccy": "USD",
+        "mv_usd": 41168.0,
+        "pct": 2.76,
+        "sector": "AI算力/半导体",
+        "sub": "代工"
+      },
+      {
+        "market": "美股",
+        "code": "NBIS",
+        "name": "NEBIUS GROUP NV",
+        "qty": 220,
+        "price": 177.05,
+        "ccy": "USD",
+        "mv_usd": 38951.0,
+        "pct": 2.61,
+        "sector": "AI算力/半导体",
+        "sub": "AI云算力"
+      },
+      {
+        "market": "美股",
+        "code": "TSLA",
+        "name": "TESLA INC (NGS)",
+        "qty": 90,
+        "price": 428.35,
+        "ccy": "USD",
+        "mv_usd": 38551.5,
+        "pct": 2.58,
+        "sector": "消费/医疗/其他",
+        "sub": "电动车"
+      },
+      {
+        "market": "美股",
+        "code": "SLV",
+        "name": "ISHARES SILVER",
+        "qty": 450,
+        "price": 73.01,
+        "ccy": "USD",
+        "mv_usd": 32854.5,
+        "pct": 2.2,
+        "sector": "稀土/金属/贵金属",
+        "sub": "白银ETF"
+      },
+      {
+        "market": "美股",
+        "code": "META",
+        "name": "META PLATFORMS",
+        "qty": 50,
+        "price": 609.63,
+        "ccy": "USD",
+        "mv_usd": 30481.5,
+        "pct": 2.04,
+        "sector": "AI软件/平台",
+        "sub": "大型科技"
+      },
+      {
+        "market": "美股",
+        "code": "AEHR",
+        "name": "AEHR TEST",
+        "qty": 300,
+        "price": 97.23,
+        "ccy": "USD",
+        "mv_usd": 29169.0,
+        "pct": 1.95,
+        "sector": "AI算力/半导体",
+        "sub": "半导体测试"
+      },
+      {
+        "market": "美股",
+        "code": "MSFT",
+        "name": "MICROSOFT CORP",
+        "qty": 70,
+        "price": 415.12,
+        "ccy": "USD",
+        "mv_usd": 29058.4,
+        "pct": 1.95,
+        "sector": "AI软件/平台",
+        "sub": "大型科技"
+      },
+      {
+        "market": "美股",
+        "code": "ONDS",
+        "name": "ONDAS INC (NCM)",
+        "qty": 3000,
+        "price": 9.06,
+        "ccy": "USD",
+        "mv_usd": 27180.0,
+        "pct": 1.82,
+        "sector": "太空/无人机/国防",
+        "sub": "无人机/通信"
+      },
+      {
+        "market": "美股",
+        "code": "CRWV",
+        "name": "COREWEAVE INC-CL",
+        "qty": 230,
+        "price": 114.15,
+        "ccy": "USD",
+        "mv_usd": 26254.5,
+        "pct": 1.76,
+        "sector": "AI算力/半导体",
+        "sub": "AI云算力"
+      },
+      {
+        "market": "美股",
+        "code": "AVGO",
+        "name": "BROADCOM INC",
+        "qty": 56,
+        "price": 430,
+        "ccy": "USD",
+        "mv_usd": 24080.0,
+        "pct": 1.61,
+        "sector": "AI算力/半导体",
+        "sub": "AI网络芯片"
+      },
+      {
+        "market": "美股",
+        "code": "RMBS",
+        "name": "RAMBUS INC (NGS)",
+        "qty": 180,
+        "price": 129.245,
+        "ccy": "USD",
+        "mv_usd": 23264.1,
+        "pct": 1.56,
+        "sector": "AI算力/半导体",
+        "sub": "IP/存储接口"
+      },
+      {
+        "market": "美股",
+        "code": "SATS",
+        "name": "ECHOSTAR CORP-A",
+        "qty": 180,
+        "price": 127.15,
+        "ccy": "USD",
+        "mv_usd": 22887.0,
+        "pct": 1.53,
+        "sector": "太空/无人机/国防",
+        "sub": "卫星通信"
+      },
+      {
+        "market": "美股",
+        "code": "QCOM",
+        "name": "QUALCOMM INC",
+        "qty": 100,
+        "price": 219.09,
+        "ccy": "USD",
+        "mv_usd": 21909.0,
+        "pct": 1.47,
+        "sector": "AI算力/半导体",
+        "sub": "移动/通信芯片"
+      },
+      {
+        "market": "美股",
+        "code": "ETN",
+        "name": "EATON CORP PLC",
+        "qty": 50,
+        "price": 401.51,
+        "ccy": "USD",
+        "mv_usd": 20075.5,
+        "pct": 1.34,
+        "sector": "消费/医疗/其他",
+        "sub": "电力/工业"
+      },
+      {
+        "market": "美股",
+        "code": "KTOS",
+        "name": "KRATOS DEFENSE &",
+        "qty": 342,
+        "price": 57.89,
+        "ccy": "USD",
+        "mv_usd": 19798.38,
+        "pct": 1.33,
+        "sector": "太空/无人机/国防",
+        "sub": "国防"
+      },
+      {
+        "market": "美股",
+        "code": "POET",
+        "name": "POET",
+        "qty": 1700,
+        "price": 10.95,
+        "ccy": "USD",
+        "mv_usd": 18615.0,
+        "pct": 1.25,
+        "sector": "AI算力/半导体",
+        "sub": "光子集成"
+      },
+      {
+        "market": "美股",
+        "code": "LITE",
+        "name": "LUMENTUM",
+        "qty": 20,
+        "price": 903.8,
+        "ccy": "USD",
+        "mv_usd": 18076.0,
+        "pct": 1.21,
+        "sector": "AI算力/半导体",
+        "sub": "光通信"
+      },
+      {
+        "market": "美股",
+        "code": "MRVL",
+        "name": "MARVELL",
+        "qty": 100,
+        "price": 170.13,
+        "ccy": "USD",
+        "mv_usd": 17013.0,
+        "pct": 1.14,
+        "sector": "AI算力/半导体",
+        "sub": "网络芯片"
+      },
+      {
+        "market": "美股",
+        "code": "USAR",
+        "name": "USA RARE EARTH",
+        "qty": 600,
+        "price": 26.96,
+        "ccy": "USD",
+        "mv_usd": 16176.0,
+        "pct": 1.08,
+        "sector": "稀土/金属/贵金属",
+        "sub": "稀土"
+      },
+      {
+        "market": "美股",
+        "code": "ASTS",
+        "name": "AST SPACEMOBILE",
+        "qty": 200,
+        "price": 75.05,
+        "ccy": "USD",
+        "mv_usd": 15010.0,
+        "pct": 1.0,
+        "sector": "太空/无人机/国防",
+        "sub": "卫星通信"
+      },
+      {
+        "market": "美股",
+        "code": "AAOI",
+        "name": "APPLIED",
+        "qty": 100,
+        "price": 148.94,
+        "ccy": "USD",
+        "mv_usd": 14894.0,
+        "pct": 1.0,
+        "sector": "AI算力/半导体",
+        "sub": "光通信"
+      },
+      {
+        "market": "美股",
+        "code": "METU",
+        "name": "DIREX DLY META",
+        "qty": 600,
+        "price": 24.69,
+        "ccy": "USD",
+        "mv_usd": 14814.0,
+        "pct": 0.99,
+        "sector": "AI软件/平台",
+        "sub": "杠杆ETF(META)"
+      },
+      {
+        "market": "美股",
+        "code": "TER",
+        "name": "TERADYNE INC",
+        "qty": 40,
+        "price": 359.77,
+        "ccy": "USD",
+        "mv_usd": 14390.8,
+        "pct": 0.96,
+        "sector": "AI算力/半导体",
+        "sub": "半导体测试"
+      },
+      {
+        "market": "美股",
+        "code": "COIN",
+        "name": "COINBASE GLOBAL",
+        "qty": 70,
+        "price": 201.16,
+        "ccy": "USD",
+        "mv_usd": 14081.2,
+        "pct": 0.94,
+        "sector": "金融科技/加密",
+        "sub": "加密交易所"
+      },
+      {
+        "market": "美股",
+        "code": "MP",
+        "name": "MP MATERIALS",
+        "qty": 200,
+        "price": 67.43,
+        "ccy": "USD",
+        "mv_usd": 13486.0,
+        "pct": 0.9,
+        "sector": "稀土/金属/贵金属",
+        "sub": "稀土"
+      },
+      {
+        "market": "美股",
+        "code": "ARM",
+        "name": "ARM HOLDINGS",
+        "qty": 60,
+        "price": 213.27,
+        "ccy": "USD",
+        "mv_usd": 12796.2,
+        "pct": 0.86,
+        "sector": "AI算力/半导体",
+        "sub": "CPU架构/IP"
+      },
+      {
+        "market": "美股",
+        "code": "ADBE",
+        "name": "ADOBE INC (NGS)",
+        "qty": 50,
+        "price": 253.04,
+        "ccy": "USD",
+        "mv_usd": 12652.0,
+        "pct": 0.85,
+        "sector": "AI软件/平台",
+        "sub": "应用软件"
+      },
+      {
+        "market": "港股",
+        "code": "09886",
+        "name": "DINGDANG HEALTH",
+        "qty": 100000,
+        "price": 0.98,
+        "ccy": "HKD",
+        "mv_usd": 12566.52,
+        "pct": 0.84,
+        "sector": "消费/医疗/其他",
+        "sub": "医疗(港股)"
+      },
+      {
+        "market": "港股",
+        "code": "02020",
+        "name": "ANTA SPORTS",
+        "qty": 1200,
+        "price": 78.5,
+        "ccy": "HKD",
+        "mv_usd": 12079.25,
+        "pct": 0.81,
+        "sector": "消费/医疗/其他",
+        "sub": "运动(港股)"
+      },
+      {
+        "market": "港股",
+        "code": "02228",
+        "name": "XTALPI",
+        "qty": 10000,
+        "price": 9.18,
+        "ccy": "HKD",
+        "mv_usd": 11771.49,
+        "pct": 0.79,
+        "sector": "AI软件/平台",
+        "sub": "AI制药(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "OKLO",
+        "name": "OKLO INC (NYS)",
+        "qty": 160,
+        "price": 72.51,
+        "ccy": "USD",
+        "mv_usd": 11601.6,
+        "pct": 0.78,
+        "sector": "量子/前沿科技",
+        "sub": "小型核反应堆"
+      },
+      {
+        "market": "美股",
+        "code": "PLTU",
+        "name": "DIRE DLY PLTR BUL",
+        "qty": 300,
+        "price": 37.75,
+        "ccy": "USD",
+        "mv_usd": 11325.0,
+        "pct": 0.76,
+        "sector": "AI软件/平台",
+        "sub": "杠杆ETF(PLTR)"
+      },
+      {
+        "market": "美股",
+        "code": "CRCL",
+        "name": "CIRCLE INTERNET",
+        "qty": 98,
+        "price": 113.67,
+        "ccy": "USD",
+        "mv_usd": 11139.66,
+        "pct": 0.75,
+        "sector": "金融科技/加密",
+        "sub": "稳定币"
+      },
+      {
+        "market": "美股",
+        "code": "AMPX",
+        "name": "AMPRIUS",
+        "qty": 630,
+        "price": 16.7,
+        "ccy": "USD",
+        "mv_usd": 10521.0,
+        "pct": 0.7,
+        "sector": "稀土/金属/贵金属",
+        "sub": "锂电池"
+      },
+      {
+        "market": "港股",
+        "code": "01788",
+        "name": "GUOTAI JUNAN I",
+        "qty": 34000,
+        "price": 2.41,
+        "ccy": "HKD",
+        "mv_usd": 10507.15,
+        "pct": 0.7,
+        "sector": "金融科技/加密",
+        "sub": "券商(港股)"
+      },
+      {
+        "market": "港股",
+        "code": "01810",
+        "name": "XIAOMI-W",
+        "qty": 2000,
+        "price": 31.7,
+        "ccy": "HKD",
+        "mv_usd": 8129.77,
+        "pct": 0.54,
+        "sector": "消费/医疗/其他",
+        "sub": "消费电子(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "RGC",
+        "name": "REGENCELL",
+        "qty": 170,
+        "price": 29.28,
+        "ccy": "USD",
+        "mv_usd": 4977.6,
+        "pct": 0.33,
+        "sector": "消费/医疗/其他",
+        "sub": "生物科技"
+      },
+      {
+        "market": "港股",
+        "code": "09992",
+        "name": "POP MART",
+        "qty": 200,
+        "price": 167.4,
+        "ccy": "HKD",
+        "mv_usd": 4293.13,
+        "pct": 0.29,
+        "sector": "消费/医疗/其他",
+        "sub": "潮玩(港股)"
+      },
+      {
+        "market": "港股",
+        "code": "00020",
+        "name": "SENSETIME-W",
+        "qty": 1500,
+        "price": 2.03,
+        "ccy": "HKD",
+        "mv_usd": 390.46,
+        "pct": 0.03,
+        "sector": "AI软件/平台",
+        "sub": "AI(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "OPENW",
+        "name": "OPENDOOR",
+        "qty": 50,
+        "price": 0.6851,
+        "ccy": "USD",
+        "mv_usd": 34.26,
+        "pct": 0.0,
+        "sector": "消费/医疗/其他",
+        "sub": "权证"
+      },
+      {
+        "market": "美股",
+        "code": "OPENL",
+        "name": "OPENDOOR",
+        "qty": 50,
+        "price": 0.364,
+        "ccy": "USD",
+        "mv_usd": 18.2,
+        "pct": 0.0,
+        "sector": "消费/医疗/其他",
+        "sub": "权证"
+      },
+      {
+        "market": "美股",
+        "code": "OPENZ",
+        "name": "OPENDOOR",
+        "qty": 50,
+        "price": 0.35,
+        "ccy": "USD",
+        "mv_usd": 17.5,
+        "pct": 0.0,
+        "sector": "消费/医疗/其他",
+        "sub": "权证"
+      }
+    ],
+    "trades": [
+      {
+        "code": "RKLB",
+        "name": "ROCKET LAB CORP (NCM)",
+        "side": "卖出",
+        "qty": 100,
+        "price": 95.2,
+        "amount": 9500.76
+      },
+      {
+        "code": "INTC",
+        "name": "INTEL CORP (NGS)",
+        "side": "卖出",
+        "qty": 70,
+        "price": 117.4286,
+        "amount": 8203.39
+      },
+      {
+        "code": "AMD",
+        "name": "ADVANCED MICRO DEVICES",
+        "side": "卖出",
+        "qty": 10,
+        "price": 446,
+        "amount": 4450.98
+      },
+      {
+        "code": "MU",
+        "name": "MICRON TECHNOLOGY INC",
+        "side": "卖出",
+        "qty": 5,
+        "price": 742,
+        "amount": 3702.5
+      },
+      {
+        "code": "POET",
+        "name": "POET TECHNOLOGIES INC",
+        "side": "卖出",
+        "qty": 100,
+        "price": 10.4,
+        "amount": 1037.89
+      }
+    ]
+  },
+  {
+    "date": "2026-05-13",
+    "net_asset": 1794798.17,
+    "port_val": 1504833.83,
+    "cash_val": 289964.34,
+    "n_hold": 54,
+    "holdings": [
+      {
+        "market": "美股",
+        "code": "NVDA",
+        "name": "NVIDIA CORP (NGS)",
+        "qty": 1000,
+        "price": 220.78,
+        "ccy": "USD",
+        "mv_usd": 220780.0,
+        "pct": 14.67,
+        "sector": "AI算力/半导体",
+        "sub": "GPU/AI芯片"
+      },
+      {
+        "market": "美股",
+        "code": "GLD",
+        "name": "SPDR GOLD SHARES",
+        "qty": 215,
+        "price": 432.93,
+        "ccy": "USD",
+        "mv_usd": 93079.95,
+        "pct": 6.19,
+        "sector": "稀土/金属/贵金属",
+        "sub": "黄金ETF"
+      },
+      {
+        "market": "美股",
+        "code": "MU",
+        "name": "MICRON",
+        "qty": 95,
+        "price": 766.58,
+        "ccy": "USD",
+        "mv_usd": 72825.1,
+        "pct": 4.84,
+        "sector": "AI算力/半导体",
+        "sub": "存储"
+      },
+      {
+        "market": "美股",
+        "code": "GOOGL",
+        "name": "ALPHABET INC-CL A",
+        "qty": 170,
+        "price": 387.35,
+        "ccy": "USD",
+        "mv_usd": 65849.5,
+        "pct": 4.38,
+        "sector": "AI软件/平台",
+        "sub": "大型科技"
+      },
+      {
+        "market": "美股",
+        "code": "RKLB",
+        "name": "ROCKET LAB CORP",
+        "qty": 500,
+        "price": 117.56,
+        "ccy": "USD",
+        "mv_usd": 58780.0,
+        "pct": 3.91,
+        "sector": "太空/无人机/国防",
+        "sub": "火箭"
+      },
+      {
+        "market": "美股",
+        "code": "AMD",
+        "name": "ADVANCED MICRO",
+        "qty": 120,
+        "price": 448.29,
+        "ccy": "USD",
+        "mv_usd": 53794.8,
+        "pct": 3.57,
+        "sector": "AI算力/半导体",
+        "sub": "GPU/AI芯片"
+      },
+      {
+        "market": "美股",
+        "code": "HOOD",
+        "name": "ROBINHOOD",
+        "qty": 600,
+        "price": 78.27,
+        "ccy": "USD",
+        "mv_usd": 46962.0,
+        "pct": 3.12,
+        "sector": "金融科技/加密",
+        "sub": "券商"
+      },
+      {
+        "market": "美股",
+        "code": "PLTR",
+        "name": "PALANTIR",
+        "qty": 320,
+        "price": 136,
+        "ccy": "USD",
+        "mv_usd": 43520.0,
+        "pct": 2.89,
+        "sector": "AI软件/平台",
+        "sub": "AI数据/政企"
+      },
+      {
+        "market": "美股",
+        "code": "INTC",
+        "name": "INTEL CORP (NGS)",
+        "qty": 360,
+        "price": 120.61,
+        "ccy": "USD",
+        "mv_usd": 43419.6,
+        "pct": 2.89,
+        "sector": "AI算力/半导体",
+        "sub": "CPU/代工"
+      },
+      {
+        "market": "港股",
+        "code": "00981",
+        "name": "SMIC",
+        "qty": 4500,
+        "price": 74.15,
+        "ccy": "HKD",
+        "mv_usd": 42787.07,
+        "pct": 2.84,
+        "sector": "AI算力/半导体",
+        "sub": "代工(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "TSM",
+        "name": "TAIWAN",
+        "qty": 100,
+        "price": 397.28,
+        "ccy": "USD",
+        "mv_usd": 39728.0,
+        "pct": 2.64,
+        "sector": "AI算力/半导体",
+        "sub": "代工"
+      },
+      {
+        "market": "美股",
+        "code": "SNDK",
+        "name": "SANDISK CORP",
+        "qty": 27,
+        "price": 1452.02,
+        "ccy": "USD",
+        "mv_usd": 39204.54,
+        "pct": 2.61,
+        "sector": "AI算力/半导体",
+        "sub": "存储"
+      },
+      {
+        "market": "美股",
+        "code": "TSLA",
+        "name": "TESLA INC (NGS)",
+        "qty": 90,
+        "price": 433.45,
+        "ccy": "USD",
+        "mv_usd": 39010.5,
+        "pct": 2.59,
+        "sector": "消费/医疗/其他",
+        "sub": "电动车"
+      },
+      {
+        "market": "美股",
+        "code": "NBIS",
+        "name": "NEBIUS GROUP NV",
+        "qty": 200,
+        "price": 179.11,
+        "ccy": "USD",
+        "mv_usd": 35822.0,
+        "pct": 2.38,
+        "sector": "AI算力/半导体",
+        "sub": "AI云算力"
+      },
+      {
+        "market": "美股",
+        "code": "SLV",
+        "name": "ISHARES SILVER",
+        "qty": 450,
+        "price": 78.55,
+        "ccy": "USD",
+        "mv_usd": 35347.5,
+        "pct": 2.35,
+        "sector": "稀土/金属/贵金属",
+        "sub": "白银ETF"
+      },
+      {
+        "market": "美股",
+        "code": "META",
+        "name": "META PLATFORMS",
+        "qty": 50,
+        "price": 603,
+        "ccy": "USD",
+        "mv_usd": 30150.0,
+        "pct": 2.0,
+        "sector": "AI软件/平台",
+        "sub": "大型科技"
+      },
+      {
+        "market": "美股",
+        "code": "MSFT",
+        "name": "MICROSOFT CORP",
+        "qty": 70,
+        "price": 407.77,
+        "ccy": "USD",
+        "mv_usd": 28543.9,
+        "pct": 1.9,
+        "sector": "AI软件/平台",
+        "sub": "大型科技"
+      },
+      {
+        "market": "美股",
+        "code": "ONDS",
+        "name": "ONDAS INC (NCM)",
+        "qty": 3000,
+        "price": 9.04,
+        "ccy": "USD",
+        "mv_usd": 27120.0,
+        "pct": 1.8,
+        "sector": "太空/无人机/国防",
+        "sub": "无人机/通信"
+      },
+      {
+        "market": "美股",
+        "code": "AEHR",
+        "name": "AEHR TEST",
+        "qty": 270,
+        "price": 96.72,
+        "ccy": "USD",
+        "mv_usd": 26114.4,
+        "pct": 1.74,
+        "sector": "AI算力/半导体",
+        "sub": "半导体测试"
+      },
+      {
+        "market": "美股",
+        "code": "CRWV",
+        "name": "COREWEAVE INC-CL",
+        "qty": 230,
+        "price": 107.75,
+        "ccy": "USD",
+        "mv_usd": 24782.5,
+        "pct": 1.65,
+        "sector": "AI算力/半导体",
+        "sub": "AI云算力"
+      },
+      {
+        "market": "美股",
+        "code": "AVGO",
+        "name": "BROADCOM INC",
+        "qty": 56,
+        "price": 419.3,
+        "ccy": "USD",
+        "mv_usd": 23480.8,
+        "pct": 1.56,
+        "sector": "AI算力/半导体",
+        "sub": "AI网络芯片"
+      },
+      {
+        "market": "美股",
+        "code": "RMBS",
+        "name": "RAMBUS INC (NGS)",
+        "qty": 180,
+        "price": 130.28,
+        "ccy": "USD",
+        "mv_usd": 23450.4,
+        "pct": 1.56,
+        "sector": "AI算力/半导体",
+        "sub": "IP/存储接口"
+      },
+      {
+        "market": "美股",
+        "code": "POET",
+        "name": "POET",
+        "qty": 1700,
+        "price": 13.73,
+        "ccy": "USD",
+        "mv_usd": 23341.0,
+        "pct": 1.55,
+        "sector": "AI算力/半导体",
+        "sub": "光子集成"
+      },
+      {
+        "market": "美股",
+        "code": "SATS",
+        "name": "ECHOSTAR CORP-A",
+        "qty": 180,
+        "price": 129.38,
+        "ccy": "USD",
+        "mv_usd": 23288.4,
+        "pct": 1.55,
+        "sector": "太空/无人机/国防",
+        "sub": "卫星通信"
+      },
+      {
+        "market": "美股",
+        "code": "QCOM",
+        "name": "QUALCOMM INC",
+        "qty": 100,
+        "price": 210.31,
+        "ccy": "USD",
+        "mv_usd": 21031.0,
+        "pct": 1.4,
+        "sector": "AI算力/半导体",
+        "sub": "移动/通信芯片"
+      },
+      {
+        "market": "美股",
+        "code": "ETN",
+        "name": "EATON CORP PLC",
+        "qty": 50,
+        "price": 401.53,
+        "ccy": "USD",
+        "mv_usd": 20076.5,
+        "pct": 1.33,
+        "sector": "消费/医疗/其他",
+        "sub": "电力/工业"
+      },
+      {
+        "market": "美股",
+        "code": "LITE",
+        "name": "LUMENTUM",
+        "qty": 20,
+        "price": 992.37,
+        "ccy": "USD",
+        "mv_usd": 19847.4,
+        "pct": 1.32,
+        "sector": "AI算力/半导体",
+        "sub": "光通信"
+      },
+      {
+        "market": "美股",
+        "code": "KTOS",
+        "name": "KRATOS DEFENSE &",
+        "qty": 342,
+        "price": 57.33,
+        "ccy": "USD",
+        "mv_usd": 19606.86,
+        "pct": 1.3,
+        "sector": "太空/无人机/国防",
+        "sub": "国防"
+      },
+      {
+        "market": "美股",
+        "code": "AAOI",
+        "name": "APPLIED",
+        "qty": 90,
+        "price": 188.28,
+        "ccy": "USD",
+        "mv_usd": 16945.2,
+        "pct": 1.13,
+        "sector": "AI算力/半导体",
+        "sub": "光通信"
+      },
+      {
+        "market": "美股",
+        "code": "MRVL",
+        "name": "MARVELL",
+        "qty": 100,
+        "price": 164.5,
+        "ccy": "USD",
+        "mv_usd": 16450.0,
+        "pct": 1.09,
+        "sector": "AI算力/半导体",
+        "sub": "网络芯片"
+      },
+      {
+        "market": "美股",
+        "code": "USAR",
+        "name": "USA RARE EARTH",
+        "qty": 600,
+        "price": 25.55,
+        "ccy": "USD",
+        "mv_usd": 15330.0,
+        "pct": 1.02,
+        "sector": "稀土/金属/贵金属",
+        "sub": "稀土"
+      },
+      {
+        "market": "美股",
+        "code": "COIN",
+        "name": "COINBASE GLOBAL",
+        "qty": 70,
+        "price": 207.64,
+        "ccy": "USD",
+        "mv_usd": 14534.8,
+        "pct": 0.97,
+        "sector": "金融科技/加密",
+        "sub": "加密交易所"
+      },
+      {
+        "market": "美股",
+        "code": "METU",
+        "name": "DIREX DLY META",
+        "qty": 600,
+        "price": 24.15,
+        "ccy": "USD",
+        "mv_usd": 14490.0,
+        "pct": 0.96,
+        "sector": "AI软件/平台",
+        "sub": "杠杆ETF(META)"
+      },
+      {
+        "market": "美股",
+        "code": "TER",
+        "name": "TERADYNE INC",
+        "qty": 40,
+        "price": 358.45,
+        "ccy": "USD",
+        "mv_usd": 14338.0,
+        "pct": 0.95,
+        "sector": "AI算力/半导体",
+        "sub": "半导体测试"
+      },
+      {
+        "market": "美股",
+        "code": "ASTS",
+        "name": "AST SPACEMOBILE",
+        "qty": 180,
+        "price": 72.96,
+        "ccy": "USD",
+        "mv_usd": 13132.8,
+        "pct": 0.87,
+        "sector": "太空/无人机/国防",
+        "sub": "卫星通信"
+      },
+      {
+        "market": "美股",
+        "code": "MP",
+        "name": "MP MATERIALS",
+        "qty": 200,
+        "price": 65.59,
+        "ccy": "USD",
+        "mv_usd": 13118.0,
+        "pct": 0.87,
+        "sector": "稀土/金属/贵金属",
+        "sub": "稀土"
+      },
+      {
+        "market": "美股",
+        "code": "ARM",
+        "name": "ARM HOLDINGS",
+        "qty": 60,
+        "price": 207.92,
+        "ccy": "USD",
+        "mv_usd": 12475.2,
+        "pct": 0.83,
+        "sector": "AI算力/半导体",
+        "sub": "CPU架构/IP"
+      },
+      {
+        "market": "港股",
+        "code": "09886",
+        "name": "DINGDANG HEALTH",
+        "qty": 100000,
+        "price": 0.96,
+        "ccy": "HKD",
+        "mv_usd": 12310.06,
+        "pct": 0.82,
+        "sector": "消费/医疗/其他",
+        "sub": "医疗(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "CRCL",
+        "name": "CIRCLE INTERNET",
+        "qty": 98,
+        "price": 123.65,
+        "ccy": "USD",
+        "mv_usd": 12117.7,
+        "pct": 0.81,
+        "sector": "金融科技/加密",
+        "sub": "稳定币"
+      },
+      {
+        "market": "美股",
+        "code": "ADBE",
+        "name": "ADOBE INC (NGS)",
+        "qty": 50,
+        "price": 240.83,
+        "ccy": "USD",
+        "mv_usd": 12041.5,
+        "pct": 0.8,
+        "sector": "AI软件/平台",
+        "sub": "应用软件"
+      },
+      {
+        "market": "港股",
+        "code": "02020",
+        "name": "ANTA SPORTS",
+        "qty": 1200,
+        "price": 77.5,
+        "ccy": "HKD",
+        "mv_usd": 11925.37,
+        "pct": 0.79,
+        "sector": "消费/医疗/其他",
+        "sub": "运动(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "AMPX",
+        "name": "AMPRIUS",
+        "qty": 630,
+        "price": 18.83,
+        "ccy": "USD",
+        "mv_usd": 11862.9,
+        "pct": 0.79,
+        "sector": "稀土/金属/贵金属",
+        "sub": "锂电池"
+      },
+      {
+        "market": "美股",
+        "code": "OKLO",
+        "name": "OKLO INC (NYS)",
+        "qty": 160,
+        "price": 73.63,
+        "ccy": "USD",
+        "mv_usd": 11780.8,
+        "pct": 0.78,
+        "sector": "量子/前沿科技",
+        "sub": "小型核反应堆"
+      },
+      {
+        "market": "港股",
+        "code": "02228",
+        "name": "XTALPI",
+        "qty": 10000,
+        "price": 8.84,
+        "ccy": "HKD",
+        "mv_usd": 11335.51,
+        "pct": 0.75,
+        "sector": "AI软件/平台",
+        "sub": "AI制药(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "PLTU",
+        "name": "DIRE DLY PLTR BUL",
+        "qty": 300,
+        "price": 36.73,
+        "ccy": "USD",
+        "mv_usd": 11019.0,
+        "pct": 0.73,
+        "sector": "AI软件/平台",
+        "sub": "杠杆ETF(PLTR)"
+      },
+      {
+        "market": "港股",
+        "code": "01788",
+        "name": "GUOTAI JUNAN I",
+        "qty": 34000,
+        "price": 2.39,
+        "ccy": "HKD",
+        "mv_usd": 10419.95,
+        "pct": 0.69,
+        "sector": "金融科技/加密",
+        "sub": "券商(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "DRAM",
+        "name": "ROUNDHILL",
+        "qty": 200,
+        "price": 51.3,
+        "ccy": "USD",
+        "mv_usd": 10260.0,
+        "pct": 0.68,
+        "sector": "AI算力/半导体",
+        "sub": "存储ETF"
+      },
+      {
+        "market": "港股",
+        "code": "01810",
+        "name": "XIAOMI-W",
+        "qty": 2000,
+        "price": 31.8,
+        "ccy": "HKD",
+        "mv_usd": 8155.41,
+        "pct": 0.54,
+        "sector": "消费/医疗/其他",
+        "sub": "消费电子(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "RGC",
+        "name": "REGENCELL",
+        "qty": 170,
+        "price": 26.35,
+        "ccy": "USD",
+        "mv_usd": 4479.5,
+        "pct": 0.3,
+        "sector": "消费/医疗/其他",
+        "sub": "生物科技"
+      },
+      {
+        "market": "港股",
+        "code": "09992",
+        "name": "POP MART",
+        "qty": 200,
+        "price": 160.9,
+        "ccy": "HKD",
+        "mv_usd": 4126.43,
+        "pct": 0.27,
+        "sector": "消费/医疗/其他",
+        "sub": "潮玩(港股)"
+      },
+      {
+        "market": "港股",
+        "code": "00020",
+        "name": "SENSETIME-W",
+        "qty": 1500,
+        "price": 1.98,
+        "ccy": "HKD",
+        "mv_usd": 380.84,
+        "pct": 0.03,
+        "sector": "AI软件/平台",
+        "sub": "AI(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "OPENW",
+        "name": "OPENDOOR",
+        "qty": 50,
+        "price": 0.6101,
+        "ccy": "USD",
+        "mv_usd": 30.51,
+        "pct": 0.0,
+        "sector": "消费/医疗/其他",
+        "sub": "权证"
+      },
+      {
+        "market": "美股",
+        "code": "OPENL",
+        "name": "OPENDOOR",
+        "qty": 50,
+        "price": 0.3122,
+        "ccy": "USD",
+        "mv_usd": 15.61,
+        "pct": 0.0,
+        "sector": "消费/医疗/其他",
+        "sub": "权证"
+      },
+      {
+        "market": "美股",
+        "code": "OPENZ",
+        "name": "OPENDOOR",
+        "qty": 50,
+        "price": 0.3001,
+        "ccy": "USD",
+        "mv_usd": 15.01,
+        "pct": 0.0,
+        "sector": "消费/医疗/其他",
+        "sub": "权证"
+      }
+    ],
+    "trades": [
+      {
+        "code": "DRAM",
+        "name": "ROUNDHILL MEMORY ETF",
+        "side": "买入",
+        "qty": 200,
+        "price": 50,
+        "amount": -10020
+      }
+    ]
+  },
+  {
+    "date": "2026-06-01",
+    "net_asset": 1889739.36,
+    "port_val": 1618474.58,
+    "cash_val": 271264.77,
+    "n_hold": 57,
+    "holdings": [
+      {
+        "market": "美股",
+        "code": "NVDA",
+        "name": "NVIDIA CORP (NGS)",
+        "qty": 950,
+        "price": 211.14,
+        "ccy": "USD",
+        "mv_usd": 200583.0,
+        "pct": 12.39,
+        "sector": "AI算力/半导体",
+        "sub": "GPU/AI芯片"
+      },
+      {
+        "market": "美股",
+        "code": "GLD",
+        "name": "SPDR GOLD SHARES",
+        "qty": 215,
+        "price": 417.12,
+        "ccy": "USD",
+        "mv_usd": 89680.8,
+        "pct": 5.54,
+        "sector": "稀土/金属/贵金属",
+        "sub": "黄金ETF"
+      },
+      {
+        "market": "美股",
+        "code": "MU",
+        "name": "MICRON",
+        "qty": 90,
+        "price": 971,
+        "ccy": "USD",
+        "mv_usd": 87390.0,
+        "pct": 5.4,
+        "sector": "AI算力/半导体",
+        "sub": "存储"
+      },
+      {
+        "market": "美股",
+        "code": "GOOGL",
+        "name": "ALPHABET INC-CL A",
+        "qty": 170,
+        "price": 380.34,
+        "ccy": "USD",
+        "mv_usd": 64657.8,
+        "pct": 3.99,
+        "sector": "AI软件/平台",
+        "sub": "大型科技"
+      },
+      {
+        "market": "美股",
+        "code": "RKLB",
+        "name": "ROCKET LAB CORP",
+        "qty": 425,
+        "price": 143.48,
+        "ccy": "USD",
+        "mv_usd": 60979.0,
+        "pct": 3.77,
+        "sector": "太空/无人机/国防",
+        "sub": "火箭"
+      },
+      {
+        "market": "美股",
+        "code": "AMD",
+        "name": "ADVANCED MICRO",
+        "qty": 110,
+        "price": 516.1,
+        "ccy": "USD",
+        "mv_usd": 56771.0,
+        "pct": 3.51,
+        "sector": "AI算力/半导体",
+        "sub": "GPU/AI芯片"
+      },
+      {
+        "market": "美股",
+        "code": "HOOD",
+        "name": "ROBINHOOD",
+        "qty": 600,
+        "price": 94.3,
+        "ccy": "USD",
+        "mv_usd": 56580.0,
+        "pct": 3.5,
+        "sector": "金融科技/加密",
+        "sub": "券商"
+      },
+      {
+        "market": "美股",
+        "code": "PLTR",
+        "name": "PALANTIR",
+        "qty": 320,
+        "price": 156.54,
+        "ccy": "USD",
+        "mv_usd": 50092.8,
+        "pct": 3.1,
+        "sector": "AI软件/平台",
+        "sub": "AI数据/政企"
+      },
+      {
+        "market": "港股",
+        "code": "00981",
+        "name": "SMIC",
+        "qty": 4500,
+        "price": 79.45,
+        "ccy": "HKD",
+        "mv_usd": 45801.31,
+        "pct": 2.83,
+        "sector": "AI算力/半导体",
+        "sub": "代工(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "SNDK",
+        "name": "SANDISK CORP",
+        "qty": 27,
+        "price": 1694.98,
+        "ccy": "USD",
+        "mv_usd": 45764.46,
+        "pct": 2.83,
+        "sector": "AI算力/半导体",
+        "sub": "存储"
+      },
+      {
+        "market": "美股",
+        "code": "TSM",
+        "name": "TAIWAN",
+        "qty": 100,
+        "price": 418.45,
+        "ccy": "USD",
+        "mv_usd": 41845.0,
+        "pct": 2.59,
+        "sector": "AI算力/半导体",
+        "sub": "代工"
+      },
+      {
+        "market": "美股",
+        "code": "INTC",
+        "name": "INTEL CORP (NGS)",
+        "qty": 360,
+        "price": 114.68,
+        "ccy": "USD",
+        "mv_usd": 41284.8,
+        "pct": 2.55,
+        "sector": "AI算力/半导体",
+        "sub": "CPU/代工"
+      },
+      {
+        "market": "美股",
+        "code": "TSLA",
+        "name": "TESLA INC (NGS)",
+        "qty": 90,
+        "price": 435.79,
+        "ccy": "USD",
+        "mv_usd": 39221.1,
+        "pct": 2.42,
+        "sector": "消费/医疗/其他",
+        "sub": "电动车"
+      },
+      {
+        "market": "美股",
+        "code": "SATG",
+        "name": "LEVERAGE SHARES",
+        "qty": 2000,
+        "price": 18.84,
+        "ccy": "USD",
+        "mv_usd": 37680.0,
+        "pct": 2.33,
+        "sector": "太空/无人机/国防",
+        "sub": "杠杆ETP(卫星)"
+      },
+      {
+        "market": "美股",
+        "code": "POET",
+        "name": "POET",
+        "qty": 3000,
+        "price": 12.29,
+        "ccy": "USD",
+        "mv_usd": 36870.0,
+        "pct": 2.28,
+        "sector": "AI算力/半导体",
+        "sub": "光子集成"
+      },
+      {
+        "market": "美股",
+        "code": "NBIS",
+        "name": "NEBIUS GROUP NV",
+        "qty": 150,
+        "price": 231.09,
+        "ccy": "USD",
+        "mv_usd": 34663.5,
+        "pct": 2.14,
+        "sector": "AI算力/半导体",
+        "sub": "AI云算力"
+      },
+      {
+        "market": "美股",
+        "code": "ASTS",
+        "name": "AST SPACEMOBILE",
+        "qty": 280,
+        "price": 113.41,
+        "ccy": "USD",
+        "mv_usd": 31754.8,
+        "pct": 1.96,
+        "sector": "太空/无人机/国防",
+        "sub": "卫星通信"
+      },
+      {
+        "market": "美股",
+        "code": "META",
+        "name": "META PLATFORMS",
+        "qty": 50,
+        "price": 632.51,
+        "ccy": "USD",
+        "mv_usd": 31625.5,
+        "pct": 1.95,
+        "sector": "AI软件/平台",
+        "sub": "大型科技"
+      },
+      {
+        "market": "美股",
+        "code": "AEHR",
+        "name": "AEHR TEST",
+        "qty": 300,
+        "price": 92.33,
+        "ccy": "USD",
+        "mv_usd": 27699.0,
+        "pct": 1.71,
+        "sector": "AI算力/半导体",
+        "sub": "半导体测试"
+      },
+      {
+        "market": "美股",
+        "code": "SLV",
+        "name": "ISHARES SILVER",
+        "qty": 400,
+        "price": 68.33,
+        "ccy": "USD",
+        "mv_usd": 27332.0,
+        "pct": 1.69,
+        "sector": "稀土/金属/贵金属",
+        "sub": "白银ETF"
+      },
+      {
+        "market": "美股",
+        "code": "RMBS",
+        "name": "RAMBUS INC (NGS)",
+        "qty": 180,
+        "price": 145.46,
+        "ccy": "USD",
+        "mv_usd": 26182.8,
+        "pct": 1.62,
+        "sector": "AI算力/半导体",
+        "sub": "IP/存储接口"
+      },
+      {
+        "market": "美股",
+        "code": "MP",
+        "name": "MP MATERIALS",
+        "qty": 400,
+        "price": 64.7,
+        "ccy": "USD",
+        "mv_usd": 25880.0,
+        "pct": 1.6,
+        "sector": "稀土/金属/贵金属",
+        "sub": "稀土"
+      },
+      {
+        "market": "美股",
+        "code": "CRWV",
+        "name": "COREWEAVE INC-CL",
+        "qty": 230,
+        "price": 109.53,
+        "ccy": "USD",
+        "mv_usd": 25191.9,
+        "pct": 1.56,
+        "sector": "AI算力/半导体",
+        "sub": "AI云算力"
+      },
+      {
+        "market": "美股",
+        "code": "QCOM",
+        "name": "QUALCOMM INC",
+        "qty": 100,
+        "price": 251.02,
+        "ccy": "USD",
+        "mv_usd": 25102.0,
+        "pct": 1.55,
+        "sector": "AI算力/半导体",
+        "sub": "移动/通信芯片"
+      },
+      {
+        "market": "美股",
+        "code": "AVGO",
+        "name": "BROADCOM INC",
+        "qty": 56,
+        "price": 446.77,
+        "ccy": "USD",
+        "mv_usd": 25019.12,
+        "pct": 1.55,
+        "sector": "AI算力/半导体",
+        "sub": "AI网络芯片"
+      },
+      {
+        "market": "美股",
+        "code": "SATS",
+        "name": "ECHOSTAR CORP-A",
+        "qty": 180,
+        "price": 129.19,
+        "ccy": "USD",
+        "mv_usd": 23254.2,
+        "pct": 1.44,
+        "sector": "太空/无人机/国防",
+        "sub": "卫星通信"
+      },
+      {
+        "market": "美股",
+        "code": "TER",
+        "name": "TERADYNE INC",
+        "qty": 60,
+        "price": 374.31,
+        "ccy": "USD",
+        "mv_usd": 22458.6,
+        "pct": 1.39,
+        "sector": "AI算力/半导体",
+        "sub": "半导体测试"
+      },
+      {
+        "market": "美股",
+        "code": "MRVL",
+        "name": "MARVELL",
+        "qty": 100,
+        "price": 205,
+        "ccy": "USD",
+        "mv_usd": 20500.0,
+        "pct": 1.27,
+        "sector": "AI算力/半导体",
+        "sub": "网络芯片"
+      },
+      {
+        "market": "美股",
+        "code": "ETN",
+        "name": "EATON CORP PLC",
+        "qty": 50,
+        "price": 400.6,
+        "ccy": "USD",
+        "mv_usd": 20030.0,
+        "pct": 1.24,
+        "sector": "消费/医疗/其他",
+        "sub": "电力/工业"
+      },
+      {
+        "market": "美股",
+        "code": "KTOS",
+        "name": "KRATOS DEFENSE &",
+        "qty": 300,
+        "price": 64.13,
+        "ccy": "USD",
+        "mv_usd": 19239.0,
+        "pct": 1.19,
+        "sector": "太空/无人机/国防",
+        "sub": "国防"
+      },
+      {
+        "market": "美股",
+        "code": "ONDS",
+        "name": "ONDAS INC (NCM)",
+        "qty": 1400,
+        "price": 13.22,
+        "ccy": "USD",
+        "mv_usd": 18508.0,
+        "pct": 1.14,
+        "sector": "太空/无人机/国防",
+        "sub": "无人机/通信"
+      },
+      {
+        "market": "美股",
+        "code": "ARM",
+        "name": "ARM HOLDINGS",
+        "qty": 50,
+        "price": 353.29,
+        "ccy": "USD",
+        "mv_usd": 17664.5,
+        "pct": 1.09,
+        "sector": "AI算力/半导体",
+        "sub": "CPU架构/IP"
+      },
+      {
+        "market": "美股",
+        "code": "USAR",
+        "name": "USA RARE EARTH",
+        "qty": 600,
+        "price": 28.01,
+        "ccy": "USD",
+        "mv_usd": 16806.0,
+        "pct": 1.04,
+        "sector": "稀土/金属/贵金属",
+        "sub": "稀土"
+      },
+      {
+        "market": "美股",
+        "code": "METU",
+        "name": "DIREX DLY META",
+        "qty": 600,
+        "price": 26.36,
+        "ccy": "USD",
+        "mv_usd": 15816.0,
+        "pct": 0.98,
+        "sector": "AI软件/平台",
+        "sub": "杠杆ETF(META)"
+      },
+      {
+        "market": "美股",
+        "code": "VRT",
+        "name": "VERTIV HOLDINGS",
+        "qty": 50,
+        "price": 315.71,
+        "ccy": "USD",
+        "mv_usd": 15785.5,
+        "pct": 0.98,
+        "sector": "AI算力/半导体",
+        "sub": "数据中心电力"
+      },
+      {
+        "market": "美股",
+        "code": "LITE",
+        "name": "LUMENTUM",
+        "qty": 18,
+        "price": 854.96,
+        "ccy": "USD",
+        "mv_usd": 15389.28,
+        "pct": 0.95,
+        "sector": "AI算力/半导体",
+        "sub": "光通信"
+      },
+      {
+        "market": "美股",
+        "code": "DXYZ",
+        "name": "DESTINY TECH100",
+        "qty": 270,
+        "price": 52.5,
+        "ccy": "USD",
+        "mv_usd": 14175.0,
+        "pct": 0.88,
+        "sector": "量子/前沿科技",
+        "sub": "科技独角兽基金"
+      },
+      {
+        "market": "美股",
+        "code": "AAOI",
+        "name": "APPLIED",
+        "qty": 85,
+        "price": 158.41,
+        "ccy": "USD",
+        "mv_usd": 13464.85,
+        "pct": 0.83,
+        "sector": "AI算力/半导体",
+        "sub": "光通信"
+      },
+      {
+        "market": "美股",
+        "code": "COIN",
+        "name": "COINBASE GLOBAL",
+        "qty": 70,
+        "price": 189.03,
+        "ccy": "USD",
+        "mv_usd": 13232.1,
+        "pct": 0.82,
+        "sector": "金融科技/加密",
+        "sub": "加密交易所"
+      },
+      {
+        "market": "美股",
+        "code": "ADBE",
+        "name": "ADOBE INC (NGS)",
+        "qty": 50,
+        "price": 259.21,
+        "ccy": "USD",
+        "mv_usd": 12960.5,
+        "pct": 0.8,
+        "sector": "AI软件/平台",
+        "sub": "应用软件"
+      },
+      {
+        "market": "美股",
+        "code": "DRAM",
+        "name": "ROUNDHILL",
+        "qty": 200,
+        "price": 63.2,
+        "ccy": "USD",
+        "mv_usd": 12640.0,
+        "pct": 0.78,
+        "sector": "AI算力/半导体",
+        "sub": "存储ETF"
+      },
+      {
+        "market": "港股",
+        "code": "02020",
+        "name": "ANTA SPORTS",
+        "qty": 1200,
+        "price": 76.4,
+        "ccy": "HKD",
+        "mv_usd": 11744.81,
+        "pct": 0.73,
+        "sector": "消费/医疗/其他",
+        "sub": "运动(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "CRCL",
+        "name": "CIRCLE INTERNET",
+        "qty": 98,
+        "price": 113,
+        "ccy": "USD",
+        "mv_usd": 11074.0,
+        "pct": 0.68,
+        "sector": "金融科技/加密",
+        "sub": "稳定币"
+      },
+      {
+        "market": "港股",
+        "code": "09886",
+        "name": "DINGDANG HEALTH",
+        "qty": 100000,
+        "price": 0.85,
+        "ccy": "HKD",
+        "mv_usd": 10889.06,
+        "pct": 0.67,
+        "sector": "消费/医疗/其他",
+        "sub": "医疗(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "OKLO",
+        "name": "OKLO INC (NYS)",
+        "qty": 160,
+        "price": 66.88,
+        "ccy": "USD",
+        "mv_usd": 10700.8,
+        "pct": 0.66,
+        "sector": "量子/前沿科技",
+        "sub": "小型核反应堆"
+      },
+      {
+        "market": "美股",
+        "code": "AXTI",
+        "name": "AXT INC (NGS)",
+        "qty": 100,
+        "price": 103.16,
+        "ccy": "USD",
+        "mv_usd": 10316.0,
+        "pct": 0.64,
+        "sector": "AI算力/半导体",
+        "sub": "半导体材料"
+      },
+      {
+        "market": "港股",
+        "code": "02228",
+        "name": "XTALPI",
+        "qty": 10000,
+        "price": 7.94,
+        "ccy": "HKD",
+        "mv_usd": 10171.66,
+        "pct": 0.63,
+        "sector": "AI软件/平台",
+        "sub": "AI制药(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "AMPX",
+        "name": "AMPRIUS",
+        "qty": 500,
+        "price": 20.28,
+        "ccy": "USD",
+        "mv_usd": 10140.0,
+        "pct": 0.63,
+        "sector": "稀土/金属/贵金属",
+        "sub": "锂电池"
+      },
+      {
+        "market": "港股",
+        "code": "01788",
+        "name": "GUOTAI JUNAN I",
+        "qty": 34000,
+        "price": 2.24,
+        "ccy": "HKD",
+        "mv_usd": 9756.6,
+        "pct": 0.6,
+        "sector": "金融科技/加密",
+        "sub": "券商(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "GEV",
+        "name": "GE VERNOVA INC",
+        "qty": 10,
+        "price": 968.32,
+        "ccy": "USD",
+        "mv_usd": 9683.2,
+        "pct": 0.6,
+        "sector": "消费/医疗/其他",
+        "sub": "电力/工业"
+      },
+      {
+        "market": "港股",
+        "code": "01810",
+        "name": "XIAOMI-W",
+        "qty": 2000,
+        "price": 28.72,
+        "ccy": "HKD",
+        "mv_usd": 7358.44,
+        "pct": 0.45,
+        "sector": "消费/医疗/其他",
+        "sub": "消费电子(港股)"
+      },
+      {
+        "market": "港股",
+        "code": "09992",
+        "name": "POP MART",
+        "qty": 200,
+        "price": 179.6,
+        "ccy": "HKD",
+        "mv_usd": 4601.59,
+        "pct": 0.28,
+        "sector": "消费/医疗/其他",
+        "sub": "潮玩(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "RGC",
+        "name": "REGENCELL",
+        "qty": 170,
+        "price": 23.9,
+        "ccy": "USD",
+        "mv_usd": 4063.0,
+        "pct": 0.25,
+        "sector": "消费/医疗/其他",
+        "sub": "生物科技"
+      },
+      {
+        "market": "港股",
+        "code": "00020",
+        "name": "SENSETIME-W",
+        "qty": 1500,
+        "price": 1.76,
+        "ccy": "HKD",
+        "mv_usd": 338.2,
+        "pct": 0.02,
+        "sector": "AI软件/平台",
+        "sub": "AI(港股)"
+      },
+      {
+        "market": "美股",
+        "code": "OPENW",
+        "name": "OPENDOOR",
+        "qty": 50,
+        "price": 0.67,
+        "ccy": "USD",
+        "mv_usd": 33.5,
+        "pct": 0.0,
+        "sector": "消费/医疗/其他",
+        "sub": "权证"
+      },
+      {
+        "market": "美股",
+        "code": "OPENL",
+        "name": "OPENDOOR",
+        "qty": 50,
+        "price": 0.31,
+        "ccy": "USD",
+        "mv_usd": 15.5,
+        "pct": 0.0,
+        "sector": "消费/医疗/其他",
+        "sub": "权证"
+      },
+      {
+        "market": "美股",
+        "code": "OPENZ",
+        "name": "OPENDOOR",
+        "qty": 50,
+        "price": 0.2601,
+        "ccy": "USD",
+        "mv_usd": 13.01,
+        "pct": 0.0,
+        "sector": "消费/医疗/其他",
+        "sub": "权证"
+      }
+    ],
+    "trades": [
+      {
+        "code": "SATG",
+        "name": "LEVERAGE SHARES 2X SATS",
+        "side": "买入",
+        "qty": 500,
+        "price": 16.7,
+        "amount": -8366.7
+      },
+      {
+        "code": "ASTS",
+        "name": "AST SPACEMOBILE INC (NGS)",
+        "side": "买入",
+        "qty": 100,
+        "price": 110,
+        "amount": -11022
+      }
+    ]
+  }
+];
+
+const SECTOR_COLORS = [
+  '#1e2761','#3d4d8c','#5d6fb8','#c9a961','#9a8654',
+  '#cadcfc','#2e8b57','#718096','#d14b4b','#f6ad55'
+];
+
+let curIdx = ALL_DATA.length - 1;
+let sortKey = 'mv_usd';
+let sortAsc = false;
+let trendChart, sectorChart, top10Chart;
+
+function fmt(n){ return '$' + Math.round(n).toLocaleString('en-US'); }
+function fmtM(n){
+  if(Math.abs(n)>=1e6) return '$'+(n/1e6).toFixed(2)+'M';
+  if(Math.abs(n)>=1e3) return '$'+(n/1e3).toFixed(1)+'K';
+  return '$'+Math.round(n).toLocaleString();
+}
+function delta(cur, prev, isCount=false){
+  if(prev===undefined) return '<span style="color:#4a5568">首期数据</span>';
+  const d = cur - prev;
+  const cls = d>0?'up':d<0?'down':'';
+  const sign = d>0?'+':'';
+  const txt = isCount ? sign+d+'只' : sign+fmtM(d);
+  return `<span class="delta ${cls}">${txt}</span>`;
+}
+
+// 日期按钮
+function buildDateBtns(){
+  const c = document.getElementById('dateBtns');
+  c.innerHTML = '';
+  ALL_DATA.forEach((d,i)=>{
+    const b = document.createElement('button');
+    b.className = 'date-btn' + (i===curIdx?' active':'');
+    b.textContent = d.date;
+    b.onclick = ()=>{ curIdx=i; refresh(); };
+    c.appendChild(b);
+  });
+}
+
+function refresh(){
+  buildDateBtns();
+  const cur = ALL_DATA[curIdx];
+  const prev = curIdx>0 ? ALL_DATA[curIdx-1] : undefined;
+  document.getElementById('lastUpdate').textContent = '结单日期：'+cur.date;
+
+  // KPI
+  document.getElementById('kpi-nav').textContent = fmtM(cur.net_asset);
+  document.getElementById('kpi-nav-d').innerHTML = prev ? delta(cur.net_asset, prev.net_asset) : '<span style="color:#4a5568">首期</span>';
+  document.getElementById('kpi-port').textContent = fmtM(cur.port_val);
+  document.getElementById('kpi-port-d').innerHTML = prev ? delta(cur.port_val, prev.port_val) : '<span style="color:#4a5568">首期</span>';
+  document.getElementById('kpi-cash').textContent = fmtM(cur.cash_val);
+  document.getElementById('kpi-cash-d').innerHTML = prev ? delta(cur.cash_val, prev.cash_val) : '<span style="color:#4a5568">首期</span>';
+  document.getElementById('kpi-hold').textContent = cur.n_hold + ' 只';
+  document.getElementById('kpi-hold-d').innerHTML = prev ? delta(cur.n_hold, prev.n_hold, true) : '<span style="color:#4a5568">首期</span>';
+
+  drawTrend();
+  drawSector(cur);
+  drawTop10(cur);
+  renderTrades(cur);
+  buildSectorFilter(cur);
+  renderTable();
+}
+
+function drawTrend(){
+  const labels = ALL_DATA.map(d=>d.date);
+  const navs   = ALL_DATA.map(d=>d.net_asset);
+  const ports  = ALL_DATA.map(d=>d.port_val);
+  if(trendChart) trendChart.destroy();
+  trendChart = new Chart(document.getElementById('trendChart'),{
+    type:'line',
+    data:{
+      labels,
+      datasets:[
+        {label:'净资产',data:navs,borderColor:'#c9a961',backgroundColor:'rgba(201,169,97,.12)',
+         tension:.4,pointRadius:5,pointHoverRadius:7,fill:true,borderWidth:2.5},
+        {label:'持仓市值',data:ports,borderColor:'#5d6fb8',backgroundColor:'rgba(93,111,184,.08)',
+         tension:.4,pointRadius:5,pointHoverRadius:7,fill:true,borderWidth:2,borderDash:[4,3]},
+      ]
+    },
+    options:{responsive:true,plugins:{legend:{labels:{color:'#a0aec0',font:{size:12}}},
+      tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+fmtM(ctx.raw)}}},
+      scales:{x:{ticks:{color:'#718096'},grid:{color:'#1a2035'}},
+              y:{ticks:{color:'#718096',callback:v=>fmtM(v)},grid:{color:'#1a2035'}}}}
+  });
+}
+
+function drawSector(cur){
+  const agg={};
+  cur.holdings.forEach(h=>{ agg[h.sector]=(agg[h.sector]||0)+h.mv_usd; });
+  const sorted = Object.entries(agg).sort((a,b)=>b[1]-a[1]);
+  if(sectorChart) sectorChart.destroy();
+  sectorChart = new Chart(document.getElementById('sectorChart'),{
+    type:'doughnut',
+    data:{
+      labels: sorted.map(s=>s[0]),
+      datasets:[{data:sorted.map(s=>Math.round(s[1])),
+        backgroundColor:SECTOR_COLORS,borderColor:'#161b27',borderWidth:2,hoverOffset:6}]
+    },
+    options:{responsive:true,cutout:'58%',
+      plugins:{legend:{position:'right',labels:{color:'#a0aec0',font:{size:11},boxWidth:12,padding:8}},
+        tooltip:{callbacks:{label:ctx=>ctx.label+': '+fmtM(ctx.raw)+' ('+
+          (ctx.raw/cur.port_val*100).toFixed(1)+'%)'}}}}
+  });
+}
+
+function drawTop10(cur){
+  const sorted = [...cur.holdings].sort((a,b)=>b.mv_usd-a.mv_usd).slice(0,10).reverse();
+  if(top10Chart) top10Chart.destroy();
+  top10Chart = new Chart(document.getElementById('top10Chart'),{
+    type:'bar',
+    data:{
+      labels: sorted.map(h=>h.code),
+      datasets:[{data:sorted.map(h=>Math.round(h.mv_usd)),
+        backgroundColor:'#3d4d8c',hoverBackgroundColor:'#5d6fb8',borderRadius:4}]
+    },
+    options:{indexAxis:'y',responsive:true,
+      plugins:{legend:{display:false},
+        tooltip:{callbacks:{label:ctx=>fmtM(ctx.raw)+' ('+sorted[ctx.dataIndex].pct.toFixed(1)+'%)'}}},
+      scales:{x:{ticks:{color:'#718096',callback:v=>fmtM(v)},grid:{color:'#1a2035'}},
+              y:{ticks:{color:'#e2e8f0',font:{weight:'bold'}},grid:{display:false}}}}
+  });
+}
+
+function renderTrades(cur){
+  const trades = cur.trades || [];
+  document.getElementById('tradeCount').textContent = trades.length ? `（${trades.length} 笔）` : '';
+  const body = document.getElementById('tradesBody');
+  if(!trades.length){
+    body.innerHTML='<div class="empty">当日无交易</div>'; return;
+  }
+  body.innerHTML = `<table class="trades-table" style="width:100%;border-collapse:collapse;font-size:13px">
+    <thead><tr style="border-bottom:1px solid #2d3748">
+      <th style="padding:8px 12px;text-align:left;color:#718096">代码</th>
+      <th style="padding:8px 12px;text-align:left;color:#718096">名称</th>
+      <th style="padding:8px 12px;color:#718096">方向</th>
+      <th style="padding:8px 12px;text-align:right;color:#718096">数量</th>
+      <th style="padding:8px 12px;text-align:right;color:#718096">价格</th>
+      <th style="padding:8px 12px;text-align:right;color:#718096">金额(USD)</th>
+    </tr></thead>
+    <tbody>${trades.map(t=>`<tr style="border-bottom:1px solid #1a2035">
+      <td style="padding:8px 12px;font-weight:600">${t.code}</td>
+      <td style="padding:8px 12px;color:#a0aec0">${t.name}</td>
+      <td style="padding:8px 12px;text-align:center" class="${t.side==='买入'?'side-buy':'side-sell'}">${t.side}</td>
+      <td style="padding:8px 12px;text-align:right">${(t.qty||0).toLocaleString()}</td>
+      <td style="padding:8px 12px;text-align:right">${(t.price||0).toLocaleString()}</td>
+      <td style="padding:8px 12px;text-align:right;color:${t.amount>0?'#48bb78':'#fc8181'}">${fmt(Math.abs(t.amount||0))}</td>
+    </tr>`).join('')}</tbody></table>`;
+}
+
+function buildSectorFilter(cur){
+  const sectors = [...new Set(cur.holdings.map(h=>h.sector))].sort();
+  const sel = document.getElementById('sectorFilter');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">全部行业</option>';
+  sectors.forEach(s=>{ const o=document.createElement('option'); o.value=s; o.textContent=s; sel.appendChild(o); });
+  if(sectors.includes(prev)) sel.value=prev;
+}
+
+function sortBy(key){
+  if(sortKey===key) sortAsc=!sortAsc; else { sortKey=key; sortAsc=false; }
+  document.querySelectorAll('thead th').forEach(th=>th.classList.remove('sorted'));
+  event.target.classList.add('sorted');
+  renderTable();
+}
+
+function renderTable(){
+  const cur = ALL_DATA[curIdx];
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const sec = document.getElementById('sectorFilter').value;
+  const mkt = document.getElementById('marketFilter').value;
+  let rows = cur.holdings.filter(h=>{
+    if(q && !h.code.toLowerCase().includes(q) && !h.name.toLowerCase().includes(q)) return false;
+    if(sec && h.sector!==sec) return false;
+    if(mkt && h.market!==mkt) return false;
+    return true;
+  });
+  rows.sort((a,b)=>{
+    const av=a[sortKey], bv=b[sortKey];
+    if(typeof av==='number') return sortAsc?av-bv:bv-av;
+    return sortAsc?String(av).localeCompare(String(bv),'zh'):String(bv).localeCompare(String(av),'zh');
+  });
+  const maxMv = Math.max(...cur.holdings.map(h=>h.mv_usd));
+  const tbody = document.getElementById('tableBody');
+  if(!rows.length){
+    tbody.innerHTML=''; document.getElementById('tableEmpty').style.display='block'; return;
+  }
+  document.getElementById('tableEmpty').style.display='none';
+  tbody.innerHTML = rows.map(h=>`<tr>
+    <td style="font-weight:700;color:#e2e8f0">${h.code}</td>
+    <td style="color:#a0aec0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${h.name}">${h.name}</td>
+    <td><span class="badge ${h.market==='美股'?'badge-us':'badge-hk'}">${h.market}</span></td>
+    <td style="color:#a0aec0;font-size:12px">${h.sector}</td>
+    <td style="color:#718096;font-size:11px">${h.sub}</td>
+    <td style="text-align:right;color:#e2e8f0">${(h.qty||0).toLocaleString()}</td>
+    <td style="text-align:right;color:#a0aec0">${h.price}</td>
+    <td style="text-align:right;font-weight:600;color:#e2e8f0">${fmt(h.mv_usd)}</td>
+    <td><div class="bar-cell">
+      <div class="bar-bg"><div class="bar-fill" style="width:${(h.mv_usd/maxMv*100).toFixed(1)}%"></div></div>
+      <span class="pct-text">${h.pct.toFixed(1)}%</span>
+    </div></td>
+  </tr>`).join('');
+}
+
+// 初始化
+buildDateBtns();
+refresh();
+</script>
+</body>
+</html>
